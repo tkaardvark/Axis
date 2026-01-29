@@ -257,3 +257,75 @@
 .teams-table tbody tr:hover td.rank-cool {
   background-color: var(--color-data-cool-hover) !important;
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .teams-table-wrapper {
+    padding: 0 12px 12px;
+  }
+
+  .teams-table-container {
+    max-height: calc(100vh - 280px);
+    border-radius: 6px;
+  }
+
+  .teams-table {
+    font-size: 13px;
+  }
+
+  .teams-table th {
+    padding: 10px 8px;
+    font-size: 10px;
+  }
+
+  .teams-table td {
+    padding: 10px 8px;
+  }
+
+  .col-rank {
+    width: 45px;
+    min-width: 45px;
+  }
+
+  .col-sticky-team {
+    left: 45px;
+  }
+
+  .col-team {
+    min-width: 160px;
+    width: 160px;
+  }
+
+  .col-stat {
+    min-width: 70px;
+    font-size: 12px;
+  }
+
+  .team-info {
+    gap: 8px;
+  }
+
+  .team-logo {
+    width: 26px;
+    height: 26px;
+  }
+
+  .team-name {
+    font-size: 12px;
+  }
+
+  .team-conference {
+    font-size: 10px;
+  }
+
+  .sub-rank {
+    font-size: 10px;
+    margin-left: 4px;
+  }
+
+  .loading,
+  .no-data {
+    padding: 24px;
+    font-size: 13px;
+  }
+}

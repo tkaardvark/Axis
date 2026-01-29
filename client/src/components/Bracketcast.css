@@ -368,3 +368,141 @@
   color: var(--color-text-secondary);
   font-size: 14px;
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .bracketcast-page .page-header {
+    padding: 16px 12px 0;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  .view-toggle {
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .view-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .bracketcast-table-wrapper {
+    padding: 0 12px 12px;
+  }
+
+  .bracketcast-table-container {
+    max-height: calc(100vh - 300px);
+    border-radius: 6px;
+  }
+
+  .bracketcast-table {
+    font-size: 13px;
+  }
+
+  .bracketcast-table th {
+    padding: 10px 8px;
+    font-size: 10px;
+  }
+
+  .bracketcast-table td {
+    padding: 8px;
+  }
+
+  .col-rpi_rank {
+    width: 45px;
+    min-width: 45px;
+  }
+
+  .col-team {
+    min-width: 150px;
+    width: 150px;
+  }
+
+  .col-area {
+    min-width: 60px;
+  }
+
+  .col-record,
+  .col-conf {
+    min-width: 55px;
+  }
+
+  .col-rpi,
+  .col-sos,
+  .col-win_pct,
+  .col-owp,
+  .col-oowp,
+  .col-net {
+    min-width: 55px;
+  }
+
+  .col-sos_rank {
+    min-width: 60px;
+  }
+
+  .col-quadrant {
+    min-width: 50px;
+    font-size: 12px;
+  }
+
+  .team-info {
+    gap: 8px;
+  }
+
+  .team-name {
+    font-size: 12px;
+  }
+
+  .team-conference {
+    font-size: 10px;
+  }
+
+  .area-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .bracket-projection {
+    padding: 0 12px;
+  }
+
+  .bracket-grid {
+    gap: 12px;
+  }
+
+  .bracket-quad {
+    border-radius: 6px;
+  }
+
+  .quad-header {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .bracket-team {
+    gap: 10px;
+    padding: 6px 12px;
+  }
+
+  .seed-number {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .bracket-team-name {
+    font-size: 12px;
+  }
+
+  .bracket-team-record {
+    font-size: 10px;
+  }
+
+  .loading {
+    padding: 24px;
+    font-size: 13px;
+  }
+}

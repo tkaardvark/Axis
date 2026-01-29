@@ -74,3 +74,40 @@
 .reset-btn:hover {
   background-color: var(--color-bg-button-hover);
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .filter-bar {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .filter-group {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .filter-group select {
+    min-width: 0;
+    width: 100%;
+    padding: 8px 32px 8px 10px;
+    font-size: 13px;
+  }
+
+  .filter-group label {
+    font-size: 11px;
+  }
+
+  .filter-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .apply-btn,
+  .reset-btn {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}

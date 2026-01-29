@@ -441,3 +441,158 @@
 .result-upcoming {
   color: var(--color-text-tertiary);
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .modal-close {
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+
+  .modal-header {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .modal-team-info {
+    gap: 12px;
+  }
+
+  .modal-team-info .team-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .modal-team-name {
+    font-size: 18px;
+  }
+
+  .modal-team-conference {
+    font-size: 13px;
+  }
+
+  .modal-records {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 24px;
+  }
+
+  .record-value {
+    font-size: 18px;
+  }
+
+  .modal-filters {
+    padding: 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .modal-filters .filter-group {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .modal-filters .filter-group select {
+    min-width: 0;
+    width: 100%;
+    padding: 8px 32px 8px 10px;
+    font-size: 13px;
+  }
+
+  .modal-table-container {
+    padding: 12px;
+  }
+
+  .splits-table th,
+  .splits-table td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .splits-table th {
+    font-size: 10px;
+  }
+
+  .splits-table .col-split {
+    min-width: 80px;
+  }
+
+  .modal-schedule-section {
+    padding: 0 12px 16px;
+  }
+
+  .modal-section-title {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .schedule-table th,
+  .schedule-table td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .schedule-table th {
+    font-size: 10px;
+  }
+
+  .schedule-table .col-date {
+    width: 70px;
+    font-size: 11px;
+  }
+
+  .schedule-table .col-location {
+    width: 50px;
+  }
+
+  .schedule-table .col-result,
+  .schedule-table .col-score {
+    width: 60px;
+  }
+
+  .schedule-table .col-type {
+    width: 100px;
+  }
+
+  .location-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .game-type-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .result-win,
+  .result-loss {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .conference-badge {
+    display: none;
+  }
+
+  .modal-loading,
+  .modal-no-data {
+    padding: 24px;
+    font-size: 13px;
+  }
+}

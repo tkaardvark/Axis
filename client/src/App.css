@@ -24,3 +24,18 @@
   color: var(--color-text-tertiary);
   margin: 0;
 }
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  .page-header {
+    padding: 16px 16px 0;
+  }
+
+  .page-header h1 {
+    font-size: 20px;
+  }
+
+  .last-updated {
+    font-size: 12px;
+  }
+}
