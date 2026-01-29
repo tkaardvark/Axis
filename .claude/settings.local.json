@@ -15,7 +15,13 @@
       "Bash(node -e:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(cd /Users/tannerkarp/Desktop/Axis\\\\ Analytics && git add:*)",
+      "Bash(done)",
+      "Bash(node migrate-add-location.js:*)",
+      "Bash(node populate-locations.js:*)",
+      "Bash(node --check:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

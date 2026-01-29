@@ -42,9 +42,9 @@ const COLUMNS = [
 ];
 
 function Bracketcast({ league, onTeamClick }) {
-  const [data, setData] = useState({ teams: [], bracket: {} });
+  const [data, setData] = useState({ teams: [], bracket: {}, pods: [] });
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('table'); // 'table' or 'bracket'
+  const [view, setView] = useState('table'); // 'table', 'bracket', or 'pods'
   const [sort, setSort] = useState({ key: 'rpi_rank', dir: 'asc' });
 
   useEffect(() => {
@@ -147,10 +147,16 @@ function Bracketcast({ league, onTeamClick }) {
           Selection Table
         </button>
         <button
+          className={`view-btn ${view === 'pods' ? 'active' : ''}`}
+          onClick={() => setView('pods')}
+        >
+          Opening Round Pods
+        </button>
+        <button
           className={`view-btn ${view === 'bracket' ? 'active' : ''}`}
           onClick={() => setView('bracket')}
         >
-          Bracket Projection
+          Seed Groups
         </button>
       </div>
 
@@ -242,16 +248,73 @@ function Bracketcast({ league, onTeamClick }) {
             </table>
           </div>
         </div>
+      ) : view === 'pods' ? (
+        <div className="pods-projection">
+          <p className="pods-description">
+            Opening round pods based on geography and conference separation.
+            Each #1 seed hosts their pod. Teams travel to the host site for the first two rounds.
+          </p>
+          <div className="pods-grid">
+            {data.pods?.map((pod) => (
+              <div key={pod.podNumber} className="pod-card">
+                <div className="pod-header">
+                  <span className="pod-number">Pod {pod.podNumber}</span>
+                  <span className="pod-location">
+                    {pod.host.city}, {pod.host.state}
+                  </span>
+                </div>
+                <div className="pod-teams">
+                  {/* Host team (seed 1) */}
+                  <div className="pod-team host">
+                    <span className="pod-seed">1</span>
+                    <div className="pod-team-info">
+                      <span className="pod-team-name">{pod.host.name}</span>
+                      <span className="pod-team-record">{pod.host.record}</span>
+                    </div>
+                    <span className="pod-distance host-badge">HOST</span>
+                  </div>
+                  {/* Other teams (seeds 2-4) */}
+                  {pod.teams.map((team) => (
+                    <div key={team.team_id} className="pod-team">
+                      <span className="pod-seed">{team.seed}</span>
+                      <div className="pod-team-info">
+                        <span className="pod-team-name">{team.name}</span>
+                        <span className="pod-team-record">{team.record}</span>
+                      </div>
+                      <span className="pod-distance">
+                        {team.distance === Infinity ? '?' : `${team.distance} mi`}
+                      </span>
+                    </div>
+                  ))}
+                  {/* Fill empty slots if fewer than 3 visiting teams */}
+                  {pod.teams.length < 3 &&
+                    Array.from({ length: 3 - pod.teams.length }).map((_, i) => (
+                      <div key={`empty-${i}`} className="pod-team empty">
+                        <span className="pod-seed">{pod.teams.length + 2 + i}</span>
+                        <div className="pod-team-info">
+                          <span className="pod-team-name">TBD</span>
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="bracket-projection">
+          <p className="bracket-description">
+            Teams grouped by seed tier. #1 seeds (1-16 RPI), #2 seeds (17-32 RPI), etc.
+          </p>
           <div className="bracket-grid">
             {['quad1', 'quad2', 'quad3', 'quad4'].map((quadKey, quadIdx) => (
               <div key={quadKey} className="bracket-quad">
-                <h3 className="quad-header">Quad {quadIdx + 1}</h3>
+                <h3 className="quad-header">#{quadIdx + 1} Seeds</h3>
                 <div className="quad-teams">
                   {data.bracket[quadKey]?.map((team) => (
                     <div key={team.team_id} className="bracket-team">
-                      <span className="seed-number">{team.seed}</span>
+                      <span className="seed-number">{team.rpi_rank}</span>
                       <div className="bracket-team-info">
                         <span className="bracket-team-name">{team.name}</span>
                         <span className="bracket-team-record">{team.record}</span>

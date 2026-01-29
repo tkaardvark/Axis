@@ -774,6 +774,10 @@ app.get('/api/bracketcast', async (req, res) => {
         t.name,
         t.conference,
         t.logo_url,
+        t.city,
+        t.state,
+        t.latitude,
+        t.longitude,
         tr.rpi,
         tr.strength_of_schedule,
         tr.naia_wins,
@@ -899,6 +903,10 @@ app.get('/api/bracketcast', async (req, res) => {
         name: team.name,
         conference: team.conference,
         logo_url: team.logo_url,
+        city: team.city,
+        state: team.state,
+        latitude: team.latitude ? parseFloat(team.latitude) : null,
+        longitude: team.longitude ? parseFloat(team.longitude) : null,
         area: CONFERENCE_AREAS[team.conference] || 'Unknown',
         // Total record (all games including non-NAIA)
         total_wins: tr.total_wins,
@@ -938,6 +946,7 @@ app.get('/api/bracketcast', async (req, res) => {
       .filter(t => t.rpi_rank && t.rpi_rank <= 64)
       .sort((a, b) => a.rpi_rank - b.rpi_rank);
 
+    // Legacy quad structure (for backward compatibility)
     const bracket = {
       quad1: qualifiedTeams.slice(0, 16).map((t, i) => ({
         seed: i + 1,
@@ -973,9 +982,109 @@ app.get('/api/bracketcast', async (req, res) => {
       })),
     };
 
+    // Step 7: Build pod assignments (16 pods of 4 teams each)
+    // Helper function to calculate distance between two points (Haversine formula)
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+      const R = 3959; // Earth's radius in miles
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Math.round(R * c);
+    };
+
+    // Get teams by seed tier
+    const seed1Teams = qualifiedTeams.slice(0, 16);  // #1 seeds (hosts)
+    const seed2Teams = qualifiedTeams.slice(16, 32); // #2 seeds
+    const seed3Teams = qualifiedTeams.slice(32, 48); // #3 seeds
+    const seed4Teams = qualifiedTeams.slice(48, 64); // #4 seeds
+
+    // Initialize 16 pods with #1 seeds as hosts
+    const pods = seed1Teams.map((host, index) => ({
+      podNumber: index + 1,
+      host: {
+        seed: 1,
+        team_id: host.team_id,
+        name: host.name,
+        conference: host.conference,
+        city: host.city,
+        state: host.state,
+        latitude: host.latitude,
+        longitude: host.longitude,
+        record: `${host.wins}-${host.losses}`,
+        rpi_rank: host.rpi_rank,
+        distance: 0, // Host travels 0 miles
+      },
+      teams: [], // Will hold #2, #3, #4 seeds
+    }));
+
+    // Function to assign a team to the best available pod
+    const assignTeamToPod = (team, seedNumber, pods) => {
+      // Calculate distance to each pod host
+      const podDistances = pods.map((pod, index) => ({
+        podIndex: index,
+        distance: calculateDistance(
+          team.latitude, team.longitude,
+          pod.host.latitude, pod.host.longitude
+        ),
+        hasConferenceConflict: pod.host.conference === team.conference ||
+          pod.teams.some(t => t.conference === team.conference),
+        currentTeamCount: pod.teams.length,
+      }));
+
+      // Sort by:
+      // 1. Pods with fewer teams (balance distribution)
+      // 2. No conference conflict preferred
+      // 3. Shortest distance
+      podDistances.sort((a, b) => {
+        // First, prefer pods that need more teams
+        if (a.currentTeamCount !== b.currentTeamCount) {
+          return a.currentTeamCount - b.currentTeamCount;
+        }
+        // Then, prefer no conference conflict
+        if (a.hasConferenceConflict !== b.hasConferenceConflict) {
+          return a.hasConferenceConflict ? 1 : -1;
+        }
+        // Finally, prefer shorter distance
+        return a.distance - b.distance;
+      });
+
+      // Assign to best pod
+      const bestPod = podDistances[0];
+      pods[bestPod.podIndex].teams.push({
+        seed: seedNumber,
+        team_id: team.team_id,
+        name: team.name,
+        conference: team.conference,
+        city: team.city,
+        state: team.state,
+        record: `${team.wins}-${team.losses}`,
+        rpi_rank: team.rpi_rank,
+        distance: bestPod.distance,
+      });
+    };
+
+    // Assign #2 seeds first (they have more flexibility)
+    seed2Teams.forEach(team => assignTeamToPod(team, 2, pods));
+
+    // Then assign #3 seeds
+    seed3Teams.forEach(team => assignTeamToPod(team, 3, pods));
+
+    // Finally assign #4 seeds
+    seed4Teams.forEach(team => assignTeamToPod(team, 4, pods));
+
+    // Sort teams within each pod by seed
+    pods.forEach(pod => {
+      pod.teams.sort((a, b) => a.seed - b.seed);
+    });
+
     res.json({
       teams: bracketcastTeams,
       bracket,
+      pods,
     });
   } catch (err) {
     console.error('Error fetching bracketcast:', err);
@@ -986,6 +1095,24 @@ app.get('/api/bracketcast', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Get last data update timestamp
+app.get('/api/last-updated', async (req, res) => {
+  try {
+    // Get the most recent updated_at from games table (when game data was last imported)
+    const result = await pool.query(`
+      SELECT MAX(updated_at) as last_update
+      FROM games
+    `);
+
+    res.json({
+      lastUpdated: result.rows[0].last_update,
+    });
+  } catch (err) {
+    console.error('Error fetching last updated:', err);
+    res.status(500).json({ error: 'Failed to fetch last updated timestamp' });
+  }
 });
 
 // Serve React app for all other routes in production

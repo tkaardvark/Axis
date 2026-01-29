@@ -41,11 +41,22 @@ function App() {
       const response = await fetch(`${API_URL}/api/teams?${params}`);
       const data = await response.json();
       setTeams(data);
-      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch teams:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLastUpdated = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/last-updated`);
+      const data = await response.json();
+      if (data.lastUpdated) {
+        setLastUpdated(new Date(data.lastUpdated));
+      }
+    } catch (error) {
+      console.error('Failed to fetch last updated:', error);
     }
   };
 
@@ -73,6 +84,7 @@ function App() {
     fetchConferences();
     fetchMonths();
     fetchTeams();
+    fetchLastUpdated();
   }, []);
 
   const handleLeagueChange = (newLeague) => {
