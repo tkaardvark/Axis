@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import './Bracketcast.css';
 import TeamLogo from './TeamLogo';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
 // Tooltip descriptions for bracketcast columns
 const TOOLTIPS = {

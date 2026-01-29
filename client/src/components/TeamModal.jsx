@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import './TeamModal.css';
 import TeamLogo from './TeamLogo';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
 // Stat group configurations (same as TeamsTable but without rank columns)
 const STAT_GROUPS = {
