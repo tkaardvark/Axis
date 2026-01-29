@@ -1,0 +1,251 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Font tokens */
+  --font-body: 'Inconsolata', 'SF Mono', 'Monaco', monospace;
+  --font-heading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* =========================
+     LIGHT MODE COLOR TOKENS
+     ========================= */
+
+  /* Primary colors */
+  --color-text-primary: #2c2c2c;
+  --color-text-secondary: #666;
+  --color-text-tertiary: #888;
+  --color-text-inverted: #fff;
+
+  /* Backgrounds */
+  --color-bg-primary: #f5f3ef;
+  --color-bg-secondary: #fff;
+  --color-bg-tertiary: #faf9f7;
+  --color-bg-header: #e8e4dc;
+  --color-bg-hover: #ebe8e2;
+  --color-bg-button-hover: #f0f0f0;
+
+  /* Accent colors */
+  --color-accent-primary: #c75a3a;
+  --color-accent-primary-hover: #b04e31;
+
+  /* Borders */
+  --color-border-primary: #d4d0c8;
+  --color-border-secondary: #e0dcd4;
+  --color-border-tertiary: #e8e4dc;
+  --color-border-light: #f0ece4;
+
+  /* Toggle/Controls */
+  --color-toggle-bg: #d4d0c8;
+  --color-toggle-active-bg: #fff;
+  --color-toggle-active-shadow: rgba(0, 0, 0, 0.1);
+
+  /* Button specific */
+  --color-btn-active-bg: #2c2c2c;
+  --color-btn-active-text: #fff;
+
+  /* Data Visualization - Offense (Warm/Hot) */
+  --color-data-hot-bg: #fde8e0;
+  --color-data-hot-hover: #fce0d6;
+  --color-data-hot-text: #c75a3a;
+  --color-data-warm-bg: #fef4ef;
+  --color-data-warm-hover: #fdefe8;
+  --color-data-warm-text: #d4845a;
+  --color-data-highlight-bg: #fdf6f4;
+  --color-data-highlight-header: #f5e0d9;
+  --color-data-highlight-header-hover: #f0d4ca;
+
+  /* Data Visualization - Defense (Cool/Cold) */
+  --color-data-cold-bg: #e0eef8;
+  --color-data-cold-hover: #d6e8f4;
+  --color-data-cold-text: #3a7bc7;
+  --color-data-cool-bg: #eff6fb;
+  --color-data-cool-hover: #e8f2f8;
+  --color-data-cool-text: #5a9ad4;
+
+  /* Region colors - East */
+  --color-region-east-bg: #e3f2fd;
+  --color-region-east-text: #1565c0;
+
+  /* Region colors - Midwest */
+  --color-region-midwest-bg: #fce4ec;
+  --color-region-midwest-text: #c2185b;
+
+  /* Region colors - North */
+  --color-region-north-bg: #e8f5e9;
+  --color-region-north-text: #2e7d32;
+
+  /* Region colors - South */
+  --color-region-south-bg: #fff3e0;
+  --color-region-south-text: #e65100;
+
+  /* Region colors - West */
+  --color-region-west-bg: #f3e5f5;
+  --color-region-west-text: #7b1fa2;
+
+  /* Region colors - Unknown/Neutral */
+  --color-region-neutral-bg: #f5f5f5;
+  --color-region-neutral-text: #757575;
+
+  /* Win/Loss indicators */
+  --color-win-bg: #e8f5e9;
+  --color-win-text: #2e7d32;
+  --color-loss-bg: #ffebee;
+  --color-loss-text: #c62828;
+
+  /* Quadrant indicators */
+  --color-quad-good-bg: #e8f5e9;
+  --color-quad-good-text: #2e7d32;
+  --color-quad-bad-bg: #ffebee;
+  --color-quad-bad-text: #c62828;
+
+  /* Modal */
+  --color-modal-overlay: rgba(0, 0, 0, 0.5);
+  --color-modal-shadow: rgba(0, 0, 0, 0.3);
+
+  /* Sticky column shadow */
+  --color-sticky-shadow: rgba(0, 0, 0, 0.06);
+
+  /* Overall row highlight */
+  --color-row-overall-bg: #fef9f7;
+  --color-row-overall-hover: #fdf5f2;
+
+  /* Base styles */
+  font-family: var(--font-body);
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================
+   DARK MODE COLOR TOKENS
+   ========================= */
+:root[data-theme="dark"] {
+  /* Primary colors */
+  --color-text-primary: #e8e4dc;
+  --color-text-secondary: #a0a0a0;
+  --color-text-tertiary: #808080;
+  --color-text-inverted: #1a1a1a;
+
+  /* Backgrounds */
+  --color-bg-primary: #1a1a1a;
+  --color-bg-secondary: #242424;
+  --color-bg-tertiary: #2a2a2a;
+  --color-bg-header: #1e1e1e;
+  --color-bg-hover: #333333;
+  --color-bg-button-hover: #3a3a3a;
+
+  /* Accent colors - slightly brighter for dark mode */
+  --color-accent-primary: #e07050;
+  --color-accent-primary-hover: #d05e40;
+
+  /* Borders */
+  --color-border-primary: #404040;
+  --color-border-secondary: #383838;
+  --color-border-tertiary: #333333;
+  --color-border-light: #2e2e2e;
+
+  /* Toggle/Controls */
+  --color-toggle-bg: #383838;
+  --color-toggle-active-bg: #4a4a4a;
+  --color-toggle-active-shadow: rgba(0, 0, 0, 0.3);
+
+  /* Button specific */
+  --color-btn-active-bg: #e8e4dc;
+  --color-btn-active-text: #1a1a1a;
+
+  /* Data Visualization - Offense (Warm/Hot) - Darkened */
+  --color-data-hot-bg: #3d2820;
+  --color-data-hot-hover: #4d3328;
+  --color-data-hot-text: #f0a080;
+  --color-data-warm-bg: #352a22;
+  --color-data-warm-hover: #3d302a;
+  --color-data-warm-text: #e0a070;
+  --color-data-highlight-bg: #302520;
+  --color-data-highlight-header: #3d2820;
+  --color-data-highlight-header-hover: #4d3328;
+
+  /* Data Visualization - Defense (Cool/Cold) - Darkened */
+  --color-data-cold-bg: #1a2a3a;
+  --color-data-cold-hover: #223448;
+  --color-data-cold-text: #70a8e0;
+  --color-data-cool-bg: #1e2830;
+  --color-data-cool-hover: #243038;
+  --color-data-cool-text: #80b8e8;
+
+  /* Region colors - East (Darkened blue) */
+  --color-region-east-bg: #1a2a40;
+  --color-region-east-text: #70a8e0;
+
+  /* Region colors - Midwest (Darkened pink) */
+  --color-region-midwest-bg: #3a1a2a;
+  --color-region-midwest-text: #e070a0;
+
+  /* Region colors - North (Darkened green) */
+  --color-region-north-bg: #1a3020;
+  --color-region-north-text: #70c080;
+
+  /* Region colors - South (Darkened orange) */
+  --color-region-south-bg: #3a2810;
+  --color-region-south-text: #f0a050;
+
+  /* Region colors - West (Darkened purple) */
+  --color-region-west-bg: #2a1a38;
+  --color-region-west-text: #c080e0;
+
+  /* Region colors - Unknown/Neutral */
+  --color-region-neutral-bg: #2a2a2a;
+  --color-region-neutral-text: #909090;
+
+  /* Win/Loss indicators - Darkened */
+  --color-win-bg: #1a3020;
+  --color-win-text: #70c080;
+  --color-loss-bg: #3a1a1a;
+  --color-loss-text: #e07070;
+
+  /* Quadrant indicators - Darkened */
+  --color-quad-good-bg: #1a3020;
+  --color-quad-good-text: #70c080;
+  --color-quad-bad-bg: #3a1a1a;
+  --color-quad-bad-text: #e07070;
+
+  /* Modal */
+  --color-modal-overlay: rgba(0, 0, 0, 0.7);
+  --color-modal-shadow: rgba(0, 0, 0, 0.5);
+
+  /* Sticky column shadow */
+  --color-sticky-shadow: rgba(0, 0, 0, 0.3);
+
+  /* Overall row highlight */
+  --color-row-overall-bg: #302520;
+  --color-row-overall-hover: #3a2a22;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--font-heading);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-body);
+}

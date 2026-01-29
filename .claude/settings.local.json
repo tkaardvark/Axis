@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 10 node -e \"\nrequire\\(''dotenv''\\).config\\(\\);\nconst { Pool } = require\\(''pg''\\);\nconst pool = new Pool\\({\n  connectionString: process.env.DATABASE_URL,\n  ssl: { rejectUnauthorized: false }\n}\\);\npool.query\\(''SELECT COUNT\\(*\\) as count FROM teams''\\).then\\(r => {\n  console.log\\(''Teams in database:'', r.rows[0].count\\);\n  pool.end\\(\\);\n}\\).catch\\(e => {\n  console.error\\(''Error:'', e.message\\);\n  pool.end\\(\\);\n}\\);\n\")",
+      "Bash(node -e \"\nrequire\\(''dotenv''\\).config\\(\\);\nconst { Pool } = require\\(''pg''\\);\nconst pool = new Pool\\({\n  connectionString: process.env.DATABASE_URL,\n  ssl: { rejectUnauthorized: false }\n}\\);\npool.query\\(''SELECT COUNT\\(*\\) as count FROM teams''\\).then\\(r => {\n  console.log\\(''Teams in database:'', r.rows[0].count\\);\n  pool.end\\(\\);\n  process.exit\\(0\\);\n}\\).catch\\(e => {\n  console.error\\(''Error:'', e.message\\);\n  pool.end\\(\\);\n  process.exit\\(1\\);\n}\\);\n\")",
+      "Bash(git --version:*)",
+      "Bash(gh --version:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(node -e \"\nrequire\\(''dotenv''\\).config\\(\\);\nconst { Pool } = require\\(''pg''\\);\nconst pool = new Pool\\({\n  connectionString: process.env.DATABASE_URL,\n  ssl: { rejectUnauthorized: false }\n}\\);\npool.query\\(''SELECT COUNT\\(*\\) as count FROM team_ratings''\\).then\\(r => {\n  console.log\\(''Ratings in database:'', r.rows[0].count\\);\n  pool.end\\(\\);\n  process.exit\\(0\\);\n}\\).catch\\(e => {\n  console.error\\(''Error:'', e.message\\);\n  pool.end\\(\\);\n  process.exit\\(1\\);\n}\\);\n\")",
+      "Bash(node -e \"\nrequire\\(''dotenv''\\).config\\(\\);\nconst { Pool } = require\\(''pg''\\);\nconst pool = new Pool\\({\n  connectionString: process.env.DATABASE_URL,\n  ssl: { rejectUnauthorized: false }\n}\\);\npool.query\\(''SELECT DISTINCT league FROM teams''\\).then\\(r => {\n  console.log\\(''Leagues:'', r.rows\\);\n  pool.end\\(\\);\n  process.exit\\(0\\);\n}\\).catch\\(e => {\n  console.error\\(''Error:'', e.message\\);\n  pool.end\\(\\);\n  process.exit\\(1\\);\n}\\);\n\")",
+      "Bash(node -e \"\nrequire\\(''dotenv''\\).config\\(\\);\nconst { Pool } = require\\(''pg''\\);\nconst pool = new Pool\\({\n  connectionString: process.env.DATABASE_URL,\n  ssl: { rejectUnauthorized: false }\n}\\);\npool.query\\(\"\"SELECT column_name FROM information_schema.columns WHERE table_name = ''games'' ORDER BY ordinal_position\"\"\\).then\\(r => {\n  console.log\\(''games columns:''\\);\n  r.rows.forEach\\(row => console.log\\(''  '' + row.column_name\\)\\);\n  pool.end\\(\\);\n  process.exit\\(0\\);\n}\\).catch\\(e => {\n  console.error\\(''Error:'', e.message\\);\n  pool.end\\(\\);\n  process.exit\\(1\\);\n}\\);\n\")",
+      "Bash(node -e:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(xargs ls:*)"
+    ]
+  }
+}

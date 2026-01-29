@@ -1,0 +1,26 @@
+.app {
+  min-height: 100vh;
+  background-color: var(--color-bg-primary);
+}
+
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  padding: 24px 24px 0;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 0 0;
+}
+
+.last-updated {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}

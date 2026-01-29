@@ -1,0 +1,443 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-modal-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--color-bg-secondary);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px var(--color-modal-shadow);
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--color-bg-primary);
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background-color 0.15s, color 0.15s;
+  z-index: 10;
+}
+
+.modal-close:hover {
+  background: var(--color-bg-header);
+  color: var(--color-text-primary);
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+  background: var(--color-bg-tertiary);
+}
+
+.modal-team-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-team-info .team-logo {
+  width: 56px;
+  height: 56px;
+}
+
+.modal-team-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-team-name {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.modal-team-conference {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.modal-records {
+  display: flex;
+  gap: 32px;
+}
+
+.modal-record {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.record-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+.record-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* Modal Filters */
+.modal-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px 24px;
+  background: var(--color-bg-primary);
+}
+
+.modal-filters .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-filters .filter-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.modal-filters .filter-group select {
+  padding: 10px 36px 10px 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  cursor: pointer;
+  min-width: 150px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.modal-filters .filter-group select:hover {
+  border-color: var(--color-text-tertiary);
+}
+
+.modal-filters .filter-group select:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+}
+
+/* Modal Body - Scrollable area */
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Modal Table */
+.modal-table-container {
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+
+.modal-loading,
+.modal-no-data {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.splits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-secondary);
+}
+
+.splits-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.splits-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--color-border-secondary);
+  background-color: var(--color-bg-primary);
+  white-space: nowrap;
+}
+
+.splits-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+}
+
+.splits-table tbody tr:hover td {
+  background-color: var(--color-bg-tertiary);
+}
+
+.splits-table .col-split {
+  font-weight: 500;
+  min-width: 100px;
+  background: var(--color-bg-secondary);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.splits-table thead .col-split {
+  z-index: 6;
+}
+
+.splits-table tbody tr:hover .col-split {
+  background-color: var(--color-bg-tertiary);
+}
+
+.splits-table .col-stat {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.splits-table th.col-stat {
+  text-align: right;
+}
+
+/* Row highlight for Overall */
+.splits-table tbody tr:first-child td {
+  background-color: var(--color-row-overall-bg);
+  font-weight: 500;
+}
+
+.splits-table tbody tr:first-child:hover td {
+  background-color: var(--color-row-overall-hover);
+}
+
+.splits-table tbody tr:first-child .col-split {
+  background-color: var(--color-row-overall-bg);
+}
+
+.splits-table tbody tr:first-child:hover .col-split {
+  background-color: var(--color-row-overall-hover);
+}
+
+/* Schedule Section */
+.modal-schedule-section {
+  padding: 0 24px 24px;
+}
+
+.modal-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-secondary);
+}
+
+.schedule-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--color-border-secondary);
+  background-color: var(--color-bg-primary);
+  white-space: nowrap;
+}
+
+.schedule-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+}
+
+.schedule-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.schedule-table tbody tr:hover td {
+  background-color: var(--color-bg-tertiary);
+}
+
+.schedule-table .col-date {
+  width: 100px;
+  color: var(--color-text-secondary);
+}
+
+.schedule-table .col-location {
+  width: 60px;
+  text-align: center;
+}
+
+.schedule-table .col-opponent {
+  font-weight: 500;
+}
+
+.schedule-table .col-result {
+  width: 80px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.schedule-table .col-score {
+  width: 80px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-table th.col-result,
+.schedule-table th.col-score,
+.schedule-table th.col-location {
+  text-align: center;
+}
+
+.result-win {
+  color: var(--color-win-text);
+  background-color: var(--color-win-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 24px;
+}
+
+.result-loss {
+  color: var(--color-loss-text);
+  background-color: var(--color-loss-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 24px;
+}
+
+.location-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.location-home {
+  color: var(--color-region-east-text);
+  background-color: var(--color-region-east-bg);
+}
+
+.location-away {
+  color: var(--color-region-west-text);
+  background-color: var(--color-region-west-bg);
+}
+
+.location-neutral {
+  color: var(--color-region-neutral-text);
+  background-color: var(--color-region-neutral-bg);
+}
+
+.conference-badge {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+/* Game Type Badges */
+.schedule-table .col-type {
+  width: 180px;
+  text-align: center;
+}
+
+.schedule-table th.col-type {
+  text-align: center;
+}
+
+.game-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.game-type-conference {
+  color: #1d4ed8;
+  background-color: rgba(59, 130, 246, 0.15);
+}
+
+.game-type-nonconference {
+  color: #7c3aed;
+  background-color: rgba(139, 92, 246, 0.15);
+}
+
+.game-type-nonnaia {
+  color: #ea580c;
+  background-color: rgba(251, 146, 60, 0.15);
+}
+
+.game-type-exhibition {
+  color: #6b7280;
+  background-color: rgba(107, 114, 128, 0.15);
+}
+
+/* Future game styling */
+.future-game td {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.result-upcoming {
+  color: var(--color-text-tertiary);
+}

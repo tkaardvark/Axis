@@ -1,0 +1,76 @@
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 24px;
+  background-color: var(--color-bg-primary);
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.filter-group select {
+  padding: 10px 36px 10px 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  background-color: var(--color-bg-secondary);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  min-width: 150px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.filter-group select:hover {
+  border-color: var(--color-text-tertiary);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.apply-btn {
+  padding: 10px 20px;
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-inverted);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.apply-btn:hover {
+  background-color: var(--color-accent-primary-hover);
+}
+
+.reset-btn {
+  padding: 10px 20px;
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.reset-btn:hover {
+  background-color: var(--color-bg-button-hover);
+}

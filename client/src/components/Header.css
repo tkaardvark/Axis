@@ -1,0 +1,141 @@
+.header-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background-color: var(--color-bg-header);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sport-selector select {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  background-color: var(--color-bg-secondary);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%232c2c2c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+/* Primary Navigation - Men's / Women's */
+.primary-nav {
+  display: flex;
+  gap: 48px;
+}
+
+.primary-nav-link {
+  font-family: var(--font-heading);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.primary-nav-link:hover {
+  color: var(--color-text-primary);
+}
+
+.primary-nav-link.active {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent-primary);
+}
+
+/* Secondary Navigation - Teams / Bracketcast */
+.secondary-nav {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 24px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.secondary-nav-link {
+  font-family: var(--font-heading);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 4px;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.secondary-nav-link:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.secondary-nav-link.active {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.theme-toggle:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-text-tertiary);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
