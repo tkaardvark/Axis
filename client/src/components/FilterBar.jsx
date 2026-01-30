@@ -66,10 +66,11 @@ function FilterBar({ conferences, months, filters, onFilterChange, onApply, onRe
           onChange={(e) => onFilterChange('statGroup', e.target.value)}
         >
           <option value="Overview">Overview</option>
-          <option value="FourFactors">Four Factors</option>
+          <option value="FourFactors">Advanced Analytics</option>
           <option value="Shooting">Shooting</option>
           <option value="Rebounding">Rebounding</option>
           <option value="Playmaking">Playmaking</option>
+          <option value="Defense">Defense</option>
           <option value="Schedule">Schedule</option>
         </select>
       </div>

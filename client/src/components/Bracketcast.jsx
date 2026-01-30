@@ -16,6 +16,8 @@ const TOOLTIPS = {
   q2: 'Quadrant 2 Record - Wins/Losses vs good opponents (Home: 46-90, Neutral: 56-105, Away: 66-120)',
   q3: 'Quadrant 3 Record - Wins/Losses vs average opponents (Home: 91-135, Neutral: 106-150, Away: 121-165)',
   q4: 'Quadrant 4 Record - Wins/Losses vs weaker opponents (Home: 136+, Neutral: 150+, Away: 166+)',
+  qwp: 'Quad Win Points - Q1 win = 4pts, Q2 win = 2pts, Q3 win = 1pt, Q4 win = 0.5pts',
+  pcr: 'Primary Criteria Ranking - Composite rank from Overall Win %, RPI, and QWP',
   net_efficiency: 'Net Efficiency - Offensive Rating minus Defensive Rating',
   sos: 'Strength of Schedule - Average quality of opponents faced',
   sos_rank: 'SOS Rank - Strength of Schedule ranking',
@@ -32,7 +34,9 @@ const COLUMNS = [
   { key: 'q2', label: 'Q2', sortKey: 'q2_wins' },
   { key: 'q3', label: 'Q3', sortKey: 'q3_wins' },
   { key: 'q4', label: 'Q4', sortKey: 'q4_wins' },
+  { key: 'qwp', label: 'QWP', sortKey: 'qwp' },
   { key: 'rpi', label: 'RPI', sortKey: 'rpi' },
+  { key: 'pcr', label: 'PCR', sortKey: 'pcr' },
   { key: 'sos_rank', label: 'SOS Rank', sortKey: 'sos_rank' },
   { key: 'sos', label: 'SOS', sortKey: 'sos' },
   { key: 'total_win_pct', label: 'Total WP', sortKey: 'total_win_pct' },
@@ -72,15 +76,49 @@ function Bracketcast({ league, onTeamClick }) {
       setSort({ key: sortKey, dir: sort.dir === 'asc' ? 'desc' : 'asc' });
     } else {
       // Default to descending for most stats, ascending for rank
-      const defaultDir = sortKey === 'rpi_rank' ? 'asc' : 'desc';
+      const defaultDir = (sortKey === 'rpi_rank' || sortKey === 'pcr') ? 'asc' : 'desc';
       setSort({ key: sortKey, dir: defaultDir });
     }
   };
 
+  const calcQWP = (team) =>
+    (team.q1_wins || 0) * 4 +
+    (team.q2_wins || 0) * 2 +
+    (team.q3_wins || 0) * 1 +
+    (team.q4_wins || 0) * 0.5;
+
   const sortedTeams = useMemo(() => {
     if (!data.teams || data.teams.length === 0) return [];
 
-    return [...data.teams].sort((a, b) => {
+    // Add QWP to each team
+    const teamsWithQWP = data.teams.map(t => ({ ...t, qwp: calcQWP(t) }));
+
+    // Rank by each criteria (descending — higher is better)
+    const rankDesc = (arr, key) => {
+      const sorted = [...arr].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+      const ranks = {};
+      sorted.forEach((t, i) => { ranks[t.team_id] = i + 1; });
+      return ranks;
+    };
+
+    const winPctRanks = rankDesc(teamsWithQWP, 'total_win_pct');
+    const rpiRanks = rankDesc(teamsWithQWP, 'rpi');
+    const qwpRanks = rankDesc(teamsWithQWP, 'qwp');
+
+    // Compute average rank for each team
+    const teamsWithAvg = teamsWithQWP.map(t => ({
+      ...t,
+      pcr_avg: (winPctRanks[t.team_id] + rpiRanks[t.team_id] + qwpRanks[t.team_id]) / 3,
+    }));
+
+    // Sort by average rank to assign final PCR position
+    const byAvg = [...teamsWithAvg].sort((a, b) => a.pcr_avg - b.pcr_avg);
+    const pcrMap = {};
+    byAvg.forEach((t, i) => { pcrMap[t.team_id] = i + 1; });
+
+    const teamsWithPCR = teamsWithAvg.map(t => ({ ...t, pcr: pcrMap[t.team_id] }));
+
+    return teamsWithPCR.sort((a, b) => {
       const key = sort.key;
       let aVal = a[key];
       let bVal = b[key];
@@ -221,8 +259,14 @@ function Bracketcast({ league, onTeamClick }) {
                     <td className={`col-quadrant ${getQuadrantClass(team.q4_wins, team.q4_losses, 4)}`}>
                       {formatQuadrant(team.q4_wins, team.q4_losses)}
                     </td>
+                    <td className="col-qwp">
+                      {team.qwp % 1 === 0 ? team.qwp.toFixed(0) : team.qwp.toFixed(1)}
+                    </td>
                     <td className="col-rpi">
                       {team.rpi ? team.rpi.toFixed(3) : '-'}
+                    </td>
+                    <td className="col-pcr">
+                      {team.pcr || '-'}
                     </td>
                     <td className="col-sos_rank">
                       {team.sos_rank || '-'}

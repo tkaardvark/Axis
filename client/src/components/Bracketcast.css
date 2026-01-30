@@ -126,6 +126,12 @@
   font-weight: 600;
 }
 
+.col-pcr {
+  width: 60px;
+  min-width: 60px;
+  text-align: center !important;
+}
+
 .col-team {
   min-width: 200px;
   width: 200px;
@@ -159,8 +165,11 @@
 .col-quadrant {
   min-width: 60px;
   text-align: center !important;
-  font-family: monospace;
-  font-size: 13px;
+}
+
+.col-qwp {
+  min-width: 60px;
+  text-align: center !important;
 }
 
 .col-net {
@@ -573,6 +582,11 @@
     min-width: 45px;
   }
 
+  .col-pcr {
+    width: 45px;
+    min-width: 45px;
+  }
+
   .col-team {
     min-width: 150px;
     width: 150px;
@@ -602,7 +616,10 @@
 
   .col-quadrant {
     min-width: 50px;
-    font-size: 12px;
+  }
+
+  .col-qwp {
+    min-width: 50px;
   }
 
   .team-info {

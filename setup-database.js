@@ -127,10 +127,10 @@ async function setupDatabase() {
         three_pt_rate DECIMAL(5,2),
 
         -- Strength of Schedule
-        rpi DECIMAL(5,3),
-        strength_of_schedule DECIMAL(6,3),
-        opponent_win_pct DECIMAL(5,3),
-        opponent_opponent_win_pct DECIMAL(5,3),
+        rpi DECIMAL(8,6),
+        strength_of_schedule DECIMAL(8,6),
+        opponent_win_pct DECIMAL(8,6),
+        opponent_opponent_win_pct DECIMAL(8,6),
         osos DECIMAL(6,2),
         dsos DECIMAL(6,2),
         nsos DECIMAL(6,2),

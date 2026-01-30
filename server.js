@@ -48,7 +48,7 @@ async function calculateDynamicStats(pool, filters) {
   } = filters;
 
   // Build the WHERE clause for game filtering
-  const gameFilters = ['g.is_naia_game = true'];
+  const gameFilters = ['g.is_naia_game = true', 'g.is_completed = true'];
   if (gameType === 'conference') {
     gameFilters.push('g.is_conference = true');
   }
