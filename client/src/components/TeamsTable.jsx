@@ -194,19 +194,9 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick }) {
     setSort({ key: defaultSort.key, dir: defaultSort.dir });
   }, [statGroup, defaultSort.key, defaultSort.dir]);
 
-  // Calculate rankings for AdjNET (always used for main rank) and sub-ranked columns
-  const rankings = useMemo(() => {
-    if (!teams || teams.length === 0) return { adjNet: {}, subRanks: {} };
-
-    // AdjNET ranking (higher is better)
-    const adjNetSorted = [...teams]
-      .filter(t => t.adjusted_net_rating != null)
-      .sort((a, b) => parseFloat(b.adjusted_net_rating) - parseFloat(a.adjusted_net_rating));
-
-    const adjNetRanks = {};
-    adjNetSorted.forEach((team, idx) => {
-      adjNetRanks[team.team_id] = idx + 1;
-    });
+  // Calculate rankings for sub-ranked columns (for inline display)
+  const subRankings = useMemo(() => {
+    if (!teams || teams.length === 0) return {};
 
     // Sub-rankings for specific columns
     const subRanks = {};
@@ -226,8 +216,54 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick }) {
       });
     });
 
-    return { adjNet: adjNetRanks, subRanks };
+    return subRanks;
   }, [teams]);
+
+  // Calculate dynamic rank based on current sort column
+  const dynamicRankings = useMemo(() => {
+    if (!teams || teams.length === 0) return {};
+
+    const sortKey = sort.key;
+    // Find the column config to determine if lower is better
+    const allColumns = Object.values(STAT_GROUPS).flatMap(g => g.columns);
+    const colConfig = allColumns.find(c => (c.sortKey || c.key) === sortKey);
+    const lowerIsBetter = colConfig?.lowerIsBetter || false;
+
+    // Sort teams by the current sort key
+    const sorted = [...teams]
+      .filter(t => {
+        if (sortKey === 'name') return true;
+        return t[sortKey] != null;
+      })
+      .sort((a, b) => {
+        if (sortKey === 'name') {
+          return (a.name || '').localeCompare(b.name || '');
+        }
+        const aVal = parseFloat(a[sortKey]) || 0;
+        const bVal = parseFloat(b[sortKey]) || 0;
+        // Rank 1 = best. For lowerIsBetter, lowest value is best.
+        return lowerIsBetter ? aVal - bVal : bVal - aVal;
+      });
+
+    const ranks = {};
+    sorted.forEach((team, idx) => {
+      ranks[team.team_id] = idx + 1;
+    });
+
+    return ranks;
+  }, [teams, sort.key]);
+
+  // Get label for what the rank column is showing
+  const getRankLabel = () => {
+    const sortKey = sort.key;
+    const allColumns = Object.values(STAT_GROUPS).flatMap(g => g.columns);
+    const colConfig = allColumns.find(c => (c.sortKey || c.key) === sortKey);
+    if (colConfig) {
+      return colConfig.label;
+    }
+    if (sortKey === 'name') return 'Name';
+    return 'Rank';
+  };
 
   const handleSort = (col) => {
     const sortKey = col.sortKey || col.key;
@@ -245,12 +281,8 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick }) {
   };
 
   const handleRankSort = () => {
-    // Always sort by AdjNET for rank column
-    if (sort.key === 'adjusted_net_rating') {
-      setSort({ key: 'adjusted_net_rating', dir: sort.dir === 'desc' ? 'asc' : 'desc' });
-    } else {
-      setSort({ key: 'adjusted_net_rating', dir: 'desc' });
-    }
+    // Toggle direction on current sort key when clicking rank
+    setSort({ key: sort.key, dir: sort.dir === 'desc' ? 'asc' : 'desc' });
   };
 
   const handleTeamSort = () => {
@@ -362,9 +394,9 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick }) {
               <th
                 className="col-rank col-sticky col-sticky-rank"
                 onClick={handleRankSort}
-                title="Overall Rank by Adjusted Net Rating"
+                title={`Rank by ${getRankLabel()} (click to reverse order)`}
               >
-                Rank{getSortIndicator('adjusted_net_rating')}
+                Rank
               </th>
               <th
                 className="col-team col-sticky col-sticky-team"
@@ -389,7 +421,7 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick }) {
             {sortedTeams.map((team) => (
               <tr key={team.team_id}>
                 <td className="col-rank col-sticky col-sticky-rank">
-                  {rankings.adjNet[team.team_id] || '-'}
+                  {dynamicRankings[team.team_id] || '-'}
                 </td>
                 <td className="col-team col-sticky col-sticky-team">
                   <div className="team-info">
@@ -406,8 +438,8 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick }) {
                   </div>
                 </td>
                 {columns.map((col) => {
-                  const showSubRank = col.showRank && rankings.subRanks[col.key];
-                  const subRank = showSubRank ? rankings.subRanks[col.key][team.team_id] : null;
+                  const showSubRank = col.showRank && subRankings[col.key];
+                  const subRank = showSubRank ? subRankings[col.key][team.team_id] : null;
                   const colorClass = showSubRank
                     ? getRankColorClass(subRank, totalTeams)
                     : '';
