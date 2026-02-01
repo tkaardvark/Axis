@@ -12,6 +12,54 @@
   margin: 4px 0 0;
 }
 
+/* Tab Navigation */
+.insights-tab-nav {
+  display: flex;
+  gap: 8px;
+  padding: 20px 24px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.insights-tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.insights-tab-btn {
+  padding: 10px 20px;
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 8px;
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.insights-tab-btn:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-primary);
+  color: var(--color-text-primary);
+}
+
+.insights-tab-btn.active {
+  background-color: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+  color: white;
+}
+
+.insights-tab-content {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .insight-card {
   margin: 30px 24px;
   padding: 24px;
@@ -58,6 +106,15 @@
   .insight-title {
     font-size: 17px;
   }
+
+  .insights-tab-nav {
+    padding: 16px 16px 0;
+  }
+
+  .insights-tab-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
 }
 
 /* Mobile */
@@ -83,6 +140,16 @@
     padding: 32px 16px;
     font-size: 13px;
   }
+
+  .insights-tab-nav {
+    padding: 12px 12px 0;
+    gap: 6px;
+  }
+
+  .insights-tab-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
 }
 
 /* Small mobile */
@@ -98,5 +165,14 @@
 
   .insight-title {
     font-size: 15px;
+  }
+
+  .insights-tab-nav {
+    padding: 10px 8px 0;
+  }
+
+  .insights-tab-btn {
+    padding: 6px 12px;
+    font-size: 11px;
   }
 }
