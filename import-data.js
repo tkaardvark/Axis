@@ -200,8 +200,22 @@ function extractGames(json, teamId) {
       location = 'away';
     }
     
-    // Parse date (timestamp is in milliseconds)
-    const gameDate = new Date(event.date);
+    // Parse date - use eventDateFormatted (e.g., "Feb 6") to avoid timezone issues
+    // The timestamp in event.date is UTC and can shift to the next day for evening games
+    // NOTE: eventDateFormatted is on eventData, not on event!
+    let gameDate;
+    if (eventData.eventDateFormatted) {
+      // eventDateFormatted is like "Feb 6" or "Jan 31" - add year from timestamp
+      const timestampDate = new Date(event.date);
+      const year = timestampDate.getFullYear();
+      gameDate = new Date(`${eventData.eventDateFormatted}, ${year}`);
+      // Handle year boundary (Dec games showing as next year, Jan games as prev year)
+      if (isNaN(gameDate.getTime())) {
+        gameDate = timestampDate; // Fallback to timestamp if parsing fails
+      }
+    } else {
+      gameDate = new Date(event.date);
+    }
     
     // Extract all box score stats (only if game has been played)
     const gameStats = hasScores ? extractGameStats(stats) : {};
@@ -311,6 +325,8 @@ async function upsertGames(client, games) {
       )
       ON CONFLICT (game_id, season)
       DO UPDATE SET
+        game_date = EXCLUDED.game_date,
+        location = EXCLUDED.location,
         team_score = EXCLUDED.team_score,
         opponent_score = EXCLUDED.opponent_score,
         is_completed = EXCLUDED.is_completed,

@@ -303,23 +303,24 @@ function Scout({ league, season, teams = [], conferences = [] }) {
     if (!percentiles?.national) return { strengths: [], weaknesses: [] };
 
     // Stat labels and categories for display
+    // For "lowerIsBetter" stats, strengthDesc is used when it's a strength, weaknessDesc when it's a weakness
     const statLabels = {
-      offensive_rating: { label: 'Offensive Efficiency', category: 'offense' },
-      defensive_rating: { label: 'Defensive Efficiency', category: 'defense', lowerIsBetter: true },
-      efg_pct: { label: 'Effective FG%', category: 'shooting' },
-      fg3_pct: { label: '3-Point Shooting', category: 'shooting' },
-      ft_pct: { label: 'Free Throw Shooting', category: 'shooting' },
-      three_pt_rate: { label: '3-Point Volume', category: 'shooting' },
-      oreb_pct: { label: 'Offensive Rebounding', category: 'rebounding' },
-      dreb_pct: { label: 'Defensive Rebounding', category: 'rebounding' },
-      to_per_game: { label: 'Ball Security', category: 'playmaking', lowerIsBetter: true },
-      ast_per_game: { label: 'Passing/Assists', category: 'playmaking' },
-      stl_per_game: { label: 'Steals', category: 'defense' },
-      blk_per_game: { label: 'Shot Blocking', category: 'defense' },
-      pts_paint_per_game: { label: 'Paint Scoring', category: 'offense' },
-      pts_fastbreak_per_game: { label: 'Transition Offense', category: 'offense' },
-      efg_pct_opp: { label: 'Opponent Shooting Defense', category: 'defense', lowerIsBetter: true },
-      oreb_pct_opp: { label: 'Limiting Opponent ORB', category: 'defense', lowerIsBetter: true },
+      offensive_rating: { label: 'Offensive Efficiency', category: 'offense', description: 'Points scored per 100 possessions' },
+      defensive_rating: { label: 'Defensive Efficiency', category: 'defense', lowerIsBetter: true, strengthDesc: 'Allows few points per 100 possessions', weaknessDesc: 'Allows many points per 100 possessions' },
+      efg_pct: { label: 'Effective FG%', category: 'shooting', description: 'Field goal % adjusted for 3-pointers' },
+      fg3_pct: { label: '3-Point Shooting', category: 'shooting', description: 'Three-point field goal percentage' },
+      ft_pct: { label: 'Free Throw Shooting', category: 'shooting', description: 'Free throw percentage' },
+      three_pt_rate: { label: '3-Point Volume', category: 'shooting', description: 'Percentage of shots taken from 3-point range' },
+      oreb_pct: { label: 'Offensive Rebounding', category: 'rebounding', description: 'Percentage of offensive rebounds grabbed' },
+      dreb_pct: { label: 'Defensive Rebounding', category: 'rebounding', description: 'Percentage of defensive rebounds grabbed' },
+      to_per_game: { label: 'Ball Security', category: 'playmaking', lowerIsBetter: true, strengthDesc: 'Commits very few turnovers per game', weaknessDesc: 'Commits many turnovers per game' },
+      ast_per_game: { label: 'Passing/Assists', category: 'playmaking', description: 'Assists per game' },
+      stl_per_game: { label: 'Steals', category: 'defense', description: 'Steals per game' },
+      blk_per_game: { label: 'Shot Blocking', category: 'defense', description: 'Blocks per game' },
+      pts_paint_per_game: { label: 'Paint Scoring', category: 'offense', description: 'Points scored in the paint per game' },
+      pts_fastbreak_per_game: { label: 'Transition Offense', category: 'offense', description: 'Fast break points per game' },
+      efg_pct_opp: { label: 'Opponent Shooting Defense', category: 'defense', lowerIsBetter: true, strengthDesc: 'Holds opponents to low shooting %', weaknessDesc: 'Allows opponents high shooting %' },
+      oreb_pct_opp: { label: 'Defensive Rebounding', category: 'defense', lowerIsBetter: true, strengthDesc: 'Limits opponent offensive rebounds', weaknessDesc: 'Gives up many offensive rebounds' },
     };
 
     const strengths = [];
@@ -330,13 +331,14 @@ function Scout({ league, season, teams = [], conferences = [] }) {
       const statInfo = statLabels[key];
       if (!statInfo) return;
 
-      // For "lower is better" stats, flip the interpretation
-      // effectivePct represents "how good" - higher is always better
-      const effectivePct = statInfo.lowerIsBetter ? (100 - pct) : pct;
+      // Server already returns percentiles where higher = better
+      // So we use pct directly (no flipping needed)
+      const effectivePct = pct;
 
       if (effectivePct >= 75) {
         strengths.push({
           stat: statInfo.label,
+          description: statInfo.strengthDesc || statInfo.description,
           percentile: Math.round(effectivePct), // Use effective percentile for display
           category: statInfo.category,
           isElite: effectivePct >= 90,
@@ -344,6 +346,7 @@ function Scout({ league, season, teams = [], conferences = [] }) {
       } else if (effectivePct <= 25) {
         weaknesses.push({
           stat: statInfo.label,
+          description: statInfo.weaknessDesc || statInfo.description,
           percentile: Math.round(100 - effectivePct), // Bottom X% (inverted for weakness display)
           category: statInfo.category,
           isSevere: effectivePct <= 10,
@@ -495,7 +498,8 @@ function Scout({ league, season, teams = [], conferences = [] }) {
                         <li key={idx} className="insight-item">
                           <div className="insight-info">
                             <span className="insight-stat">{item.stat}</span>
-                            <span className="insight-percentile">{item.percentile}th percentile nationally</span>
+                            <span className="insight-description">{item.description}</span>
+                            <span className="insight-percentile">Top {Math.max(1, 100 - item.percentile)}% nationally</span>
                           </div>
                           <span className={`insight-badge ${item.isElite ? 'elite' : 'strong'}`}>
                             {item.isElite ? 'Elite' : 'Strong'}
@@ -520,7 +524,8 @@ function Scout({ league, season, teams = [], conferences = [] }) {
                         <li key={idx} className="insight-item">
                           <div className="insight-info">
                             <span className="insight-stat">{item.stat}</span>
-                            <span className="insight-percentile">{100 - item.percentile}th percentile nationally</span>
+                            <span className="insight-description">{item.description}</span>
+                            <span className="insight-percentile">Bottom {Math.max(1, 100 - item.percentile)}% nationally</span>
                           </div>
                           <span className={`insight-badge ${item.isSevere ? 'severe' : 'weak'}`}>
                             {item.isSevere ? 'Poor' : 'Below Avg'}

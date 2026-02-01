@@ -1175,7 +1175,20 @@ app.get('/api/teams/:teamId/schedule', async (req, res) => {
       };
     });
 
-    res.json({ games });
+    // Deduplicate games - keep only one game per date + opponent combination
+    // Some scraping may create duplicate entries
+    const seenGames = new Set();
+    const deduplicatedGames = games.filter(game => {
+      const dateStr = new Date(game.date).toISOString().split('T')[0];
+      const key = `${dateStr}_${game.opponent_name}`;
+      if (seenGames.has(key)) {
+        return false;
+      }
+      seenGames.add(key);
+      return true;
+    });
+
+    res.json({ games: deduplicatedGames });
   } catch (err) {
     console.error('Error fetching team schedule:', err);
     res.status(500).json({ error: 'Failed to fetch team schedule' });
