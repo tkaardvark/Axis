@@ -2,12 +2,34 @@ import './Header.css';
 import logoSrc from '../assets/logo.svg';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 
-function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange }) {
+const PAGE_LABELS = {
+  teams: 'Teams',
+  bracketcast: 'Bracketcast',
+  scout: 'Scout',
+  insights: 'Insights'
+};
+
+function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange, lastUpdated }) {
   const { theme, toggleTheme } = useTheme();
+
+  const formatLastUpdated = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    });
+  };
 
   return (
     <div className="header-wrapper">
-      <header className="header">
+      {/* Top bar: Logo | Last Updated | Theme Toggle */}
+      <header className="header-top">
         <div className="header-left">
           <div className="logo">
             <img src={logoSrc} alt="Axis Analytics" className="logo-icon" />
@@ -15,36 +37,15 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
           </div>
         </div>
 
-        <nav className="primary-nav">
-          <a
-            href="#"
-            className={`primary-nav-link ${league === 'mens' ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); onLeagueChange('mens'); }}
-          >
-            Men's
-          </a>
-          <a
-            href="#"
-            className={`primary-nav-link ${league === 'womens' ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); onLeagueChange('womens'); }}
-          >
-            Women's
-          </a>
-        </nav>
+        <div className="header-center">
+          {lastUpdated && (
+            <span className="last-updated">
+              Last Updated {formatLastUpdated(lastUpdated)}
+            </span>
+          )}
+        </div>
 
         <div className="header-right">
-          {seasons.length > 1 && (
-            <div className="season-selector">
-              <select
-                value={season}
-                onChange={(e) => onSeasonChange(e.target.value)}
-              >
-                {seasons.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <button
             className="theme-toggle"
             onClick={toggleTheme}
@@ -77,28 +78,69 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
         </div>
       </header>
 
-      <nav className="secondary-nav">
-        <a
-          href="#"
-          className={`secondary-nav-link ${activePage === 'teams' ? 'active' : ''}`}
-          onClick={(e) => { e.preventDefault(); onPageChange('teams'); }}
-        >
-          Teams
-        </a>
-        <a
-          href="#"
-          className={`secondary-nav-link ${activePage === 'bracketcast' ? 'active' : ''}`}
-          onClick={(e) => { e.preventDefault(); onPageChange('bracketcast'); }}
-        >
-          Bracketcast
-        </a>
-        <a
-          href="#"
-          className={`secondary-nav-link ${activePage === 'insights' ? 'active' : ''}`}
-          onClick={(e) => { e.preventDefault(); onPageChange('insights'); }}
-        >
-          Insights
-        </a>
+      {/* Navigation bar: Dropdowns (left) | Page Nav (right) */}
+      <nav className="header-nav">
+        <div className="nav-left">
+          <div className="dropdown-selector">
+            <select
+              value={league}
+              onChange={(e) => onLeagueChange(e.target.value)}
+            >
+              <option value="mens">Men's Basketball</option>
+              <option value="womens">Women's Basketball</option>
+            </select>
+          </div>
+          {seasons.length > 0 && (
+            <div className="dropdown-selector">
+              <select
+                value={season}
+                onChange={(e) => onSeasonChange(e.target.value)}
+              >
+                {seasons.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {/* Mobile-only page dropdown */}
+          <div className="dropdown-selector nav-dropdown-mobile">
+            <select
+              value={activePage}
+              onChange={(e) => onPageChange(e.target.value)}
+            >
+              {Object.entries(PAGE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="nav-right">
+          <button
+            className={`nav-button ${activePage === 'teams' ? 'active' : ''}`}
+            onClick={() => onPageChange('teams')}
+          >
+            Teams
+          </button>
+          <button
+            className={`nav-button ${activePage === 'bracketcast' ? 'active' : ''}`}
+            onClick={() => onPageChange('bracketcast')}
+          >
+            Bracketcast
+          </button>
+          <button
+            className={`nav-button ${activePage === 'scout' ? 'active' : ''}`}
+            onClick={() => onPageChange('scout')}
+          >
+            Scout
+          </button>
+          <button
+            className={`nav-button ${activePage === 'insights' ? 'active' : ''}`}
+            onClick={() => onPageChange('insights')}
+          >
+            Insights
+          </button>
+        </div>
       </nav>
     </div>
   );

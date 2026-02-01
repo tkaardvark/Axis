@@ -1,0 +1,1166 @@
+.scout-page {
+  padding-bottom: 24px;
+}
+
+.scout-page .page-header {
+  padding: 24px 24px 0;
+}
+
+.scout-page .page-subtitle {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Team Filters - matches FilterBar */
+.scout-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 24px;
+  background-color: var(--color-bg-primary);
+  flex-wrap: wrap;
+}
+
+.scout-filters .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scout-filters .filter-group label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.scout-filters .filter-group select {
+  padding: 10px 36px 10px 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  background-color: var(--color-bg-secondary);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  min-width: 200px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.scout-filters .filter-group select:hover {
+  border-color: var(--color-text-tertiary);
+}
+
+/* Empty State */
+.scout-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  margin: 0 24px;
+  background-color: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 2px dashed var(--color-border-primary);
+}
+
+.scout-empty-state .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.scout-empty-state p {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: var(--color-text-tertiary);
+}
+
+/* Loading & Error */
+.scout-loading,
+.scout-error,
+.scout-no-data {
+  padding: 40px 24px;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  color: var(--color-text-tertiary);
+}
+
+/* Scout Content */
+.scout-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 0 24px;
+}
+
+/* Header Card */
+.scout-header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background-color: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-primary);
+}
+
+.scout-team-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.scout-team-info .team-logo {
+  width: 80px;
+  height: 80px;
+}
+
+.scout-team-info .team-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.scout-team-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scout-team-name {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.scout-team-conference {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.scout-team-location {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.scout-records {
+  display: flex;
+  gap: 32px;
+}
+
+.scout-record {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.scout-record .record-label {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scout-record .record-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* Radar Chart */
+.team-radar-container {
+  background-color: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-primary);
+  padding: 20px;
+}
+
+.radar-header {
+  margin-bottom: 8px;
+}
+
+.radar-header h3 {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.radar-subtitle {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.radar-chart-wrapper {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.radar-tooltip {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.radar-tooltip .tooltip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.radar-tooltip .tooltip-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+  margin: 0 0 2px 0;
+}
+
+.radar-tooltip .tooltip-percentile {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+.radar-legend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-primary);
+}
+
+.radar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.legend-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legend-marker.strong {
+  background-color: var(--color-positive);
+}
+
+.legend-marker.average {
+  background-color: var(--color-accent);
+}
+
+.legend-marker.weak {
+  background-color: var(--color-negative);
+}
+
+/* Charts Row - Side by Side */
+.scout-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .scout-charts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Season Trajectory Chart */
+.trajectory-container {
+  background-color: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-primary);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.trajectory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.trajectory-header h3 {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.trajectory-trend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.trajectory-trend.improving {
+  color: var(--color-positive);
+  background-color: rgba(16, 185, 129, 0.12);
+}
+
+.trajectory-trend.declining {
+  color: var(--color-negative);
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+.trajectory-trend.steady {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-tertiary);
+}
+
+.trajectory-chart-wrapper {
+  flex: 1;
+  min-height: 280px;
+}
+
+.trajectory-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-primary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.trajectory-legend {
+  display: flex;
+  gap: 20px;
+}
+
+.trajectory-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.trajectory-legend .legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.trajectory-legend .legend-dot.win {
+  background-color: #22c55e;
+}
+
+.trajectory-legend .legend-dot.loss {
+  background-color: #ef4444;
+}
+
+.trajectory-legend .legend-line {
+  width: 20px;
+  height: 3px;
+  background-color: var(--color-chart-line);
+  border-radius: 2px;
+}
+
+.trajectory-note {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.trajectory-tooltip {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.trajectory-tooltip .tooltip-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 4px 0;
+}
+
+.trajectory-tooltip .tooltip-opponent {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin: 0 0 6px 0;
+}
+
+.trajectory-tooltip .tooltip-result {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.trajectory-tooltip .tooltip-result.win {
+  color: var(--color-positive);
+}
+
+.trajectory-tooltip .tooltip-result.loss {
+  color: var(--color-negative);
+}
+
+.trajectory-tooltip .tooltip-margin {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0 0 2px 0;
+}
+
+.trajectory-tooltip .tooltip-detail {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  margin: 0 0 4px 0;
+}
+
+.trajectory-tooltip .tooltip-record {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+/* Sections */
+.scout-section {
+  background-color: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-primary);
+  overflow: hidden;
+}
+
+.scout-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.scout-section-header h3 {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.scout-stat-group-selector select {
+  padding: 6px 30px 6px 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 6px;
+  background-color: var(--color-bg-primary);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+/* Tables */
+.scout-table-container {
+  overflow-x: auto;
+}
+
+.scout-splits-table,
+.scout-schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.scout-splits-table th,
+.scout-splits-table td,
+.scout-schedule-table th,
+.scout-schedule-table td {
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.scout-splits-table th,
+.scout-schedule-table th {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background-color: var(--color-bg-tertiary);
+}
+
+.scout-splits-table td,
+.scout-schedule-table td {
+  color: var(--color-text-primary);
+}
+
+.scout-splits-table .col-split,
+.scout-schedule-table .col-opponent {
+  text-align: left;
+  font-weight: 500;
+}
+
+.scout-splits-table tbody tr:hover,
+.scout-schedule-table tbody tr:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.scout-splits-table tbody tr:last-child td,
+.scout-schedule-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Scouting Report - Strengths & Weaknesses */
+.scout-insights-section {
+  margin-top: 24px;
+}
+
+.scout-insights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.scout-insights-card {
+  background-color: var(--color-bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.scout-insights-card.strengths {
+  border-left: 4px solid var(--color-success);
+}
+
+.scout-insights-card.weaknesses {
+  border-left: 4px solid var(--color-error);
+}
+
+.insights-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 16px 0;
+}
+
+.insights-icon {
+  font-size: 18px;
+}
+
+.insights-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.insight-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.insight-item:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.insight-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.insight-stat {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.insight-percentile {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.insight-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.insight-badge.elite {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--color-success);
+}
+
+.insight-badge.strong {
+  background-color: rgba(34, 197, 94, 0.08);
+  color: var(--color-success);
+}
+
+.insight-badge.severe {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-error);
+}
+
+.insight-badge.weak {
+  background-color: rgba(239, 68, 68, 0.08);
+  color: var(--color-error);
+}
+
+.no-insights {
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  margin: 0;
+  padding: 12px 0;
+}
+
+@media (max-width: 768px) {
+  .scout-insights-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Percentile Rows */
+.percentile-row {
+  /* Remove default row border - we'll add specific borders below */
+}
+
+.percentile-row td {
+  border-bottom: none !important;
+}
+
+/* Remove border-bottom from the row before percentile rows */
+.scout-splits-table tbody tr:has(+ .percentile-row) td {
+  border-bottom: none !important;
+}
+
+.percentile-row .percentile-label {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.percentile-row .percentile-count {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+}
+
+.percentile-row .percentile-cell {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.percentile-row.conference-percentile {
+  background-color: var(--color-bg-tertiary);
+}
+
+.percentile-row.conference-percentile td {
+  border-top: 1px solid var(--color-border-primary) !important;
+}
+
+.percentile-row.national-percentile {
+  background-color: var(--color-bg-secondary);
+}
+
+.percentile-row.national-percentile td {
+  border-top: 1px solid var(--color-border-primary) !important;
+}
+
+/* Percentile color classes - match Teams page scale */
+.percentile-cell.pct-hot {
+  background-color: var(--color-data-hot-bg) !important;
+  color: var(--color-text-primary);
+}
+
+.percentile-cell.pct-warm {
+  background-color: var(--color-data-warm-bg) !important;
+  color: var(--color-text-primary);
+}
+
+.percentile-cell.pct-cold {
+  background-color: var(--color-data-cold-bg) !important;
+  color: var(--color-text-primary);
+}
+
+.percentile-cell.pct-cool {
+  background-color: var(--color-data-cool-bg) !important;
+  color: var(--color-text-primary);
+}
+
+/* Schedule specific styles */
+.scout-schedule-table .col-date {
+  white-space: nowrap;
+  text-align: left;
+}
+
+.scout-schedule-table .col-type {
+  width: 180px;
+}
+
+.future-game {
+  opacity: 0.6;
+}
+
+/* Location Badge - match TeamModal */
+.scout-schedule-table .location-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.scout-schedule-table .location-home {
+  color: var(--color-region-east-text);
+  background-color: var(--color-region-east-bg);
+}
+
+.scout-schedule-table .location-away {
+  color: var(--color-region-west-text);
+  background-color: var(--color-region-west-bg);
+}
+
+.scout-schedule-table .location-neutral {
+  color: var(--color-region-neutral-text);
+  background-color: var(--color-region-neutral-bg);
+}
+
+/* Game Type Badge - match TeamModal */
+.scout-schedule-table .game-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.scout-schedule-table .game-type-conference {
+  color: #1d4ed8;
+  background-color: rgba(59, 130, 246, 0.15);
+}
+
+.scout-schedule-table .game-type-nonconference {
+  color: #7c3aed;
+  background-color: rgba(139, 92, 246, 0.15);
+}
+
+.scout-schedule-table .game-type-nonnaia {
+  color: #ea580c;
+  background-color: rgba(251, 146, 60, 0.15);
+}
+
+.scout-schedule-table .game-type-exhibition {
+  color: #6b7280;
+  background-color: rgba(107, 114, 128, 0.15);
+}
+
+.scout-schedule-table .game-type-postseason {
+  color: #059669;
+  background-color: rgba(16, 185, 129, 0.15);
+}
+
+.scout-schedule-table .game-type-conferencetournament {
+  color: #0891b2;
+  background-color: rgba(6, 182, 212, 0.15);
+}
+
+.scout-schedule-table .game-type-nationaltournament {
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.15);
+  font-weight: 700;
+}
+
+/* Quadrant Badge - match TeamModal */
+.scout-schedule-table .quad-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.scout-schedule-table .quad-1 {
+  color: #92400e;
+  background-color: rgba(217, 169, 56, 0.18);
+}
+
+.scout-schedule-table .quad-2 {
+  color: #0f766e;
+  background-color: rgba(20, 184, 166, 0.14);
+}
+
+.scout-schedule-table .quad-3 {
+  color: #64748b;
+  background-color: rgba(100, 116, 139, 0.14);
+}
+
+.scout-schedule-table .quad-4 {
+  color: #94a3b8;
+  background-color: rgba(148, 163, 184, 0.12);
+}
+
+/* Result - match TeamModal */
+.scout-schedule-table .result-win {
+  color: var(--color-win-text);
+  background-color: var(--color-win-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 24px;
+  font-weight: 600;
+}
+
+.scout-schedule-table .result-loss {
+  color: var(--color-loss-text);
+  background-color: var(--color-loss-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 24px;
+  font-weight: 600;
+}
+
+.scout-schedule-table .result-upcoming {
+  color: var(--color-text-tertiary);
+}
+
+/* Predicted result styling */
+.scout-schedule-table .result-predicted {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.scout-schedule-table .result-predicted.result-win {
+  color: var(--color-win-text);
+  background-color: var(--color-win-bg);
+  border: 1px dashed var(--color-win-text);
+}
+
+.scout-schedule-table .result-predicted.result-loss {
+  color: var(--color-loss-text);
+  background-color: var(--color-loss-bg);
+  border: 1px dashed var(--color-loss-text);
+}
+
+.scout-schedule-table .result-predicted .win-prob {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.scout-schedule-table .score-predicted {
+  font-style: italic;
+  opacity: 0.7;
+  color: var(--color-text-secondary);
+}
+
+/* Net Rating */
+.scout-schedule-table .net-positive {
+  color: var(--color-win-text);
+  font-weight: 500;
+}
+
+.scout-schedule-table .net-negative {
+  color: var(--color-loss-text);
+  font-weight: 500;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .scout-page .page-header {
+    padding: 16px 16px 0;
+  }
+
+  .scout-filters {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .scout-filters .filter-group {
+    flex: 1;
+  }
+
+  .scout-filters .filter-group select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .scout-content {
+    padding: 0 12px;
+    gap: 16px;
+  }
+
+  .scout-empty-state {
+    margin: 0 12px;
+    padding: 48px 16px;
+  }
+
+  .scout-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .scout-records {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .scout-team-name {
+    font-size: 18px;
+  }
+
+  .scout-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .scout-section-header h3 {
+    font-size: 15px;
+  }
+
+  .scout-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scout-splits-table,
+  .scout-schedule-table {
+    min-width: 600px;
+  }
+
+  .scout-splits-table th,
+  .scout-splits-table td,
+  .scout-schedule-table th,
+  .scout-schedule-table td {
+    padding: 10px 10px;
+    font-size: 12px;
+  }
+
+  .scout-splits-table th,
+  .scout-schedule-table th {
+    font-size: 10px;
+  }
+
+  /* Insights section mobile */
+  .scout-insights-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .scout-insights-card {
+    padding: 16px;
+  }
+
+  .insights-title {
+    font-size: 15px;
+  }
+
+  .insight-item {
+    padding: 10px 12px;
+  }
+
+  .insight-stat {
+    font-size: 13px;
+  }
+
+  .insight-percentile {
+    font-size: 11px;
+  }
+
+  .insight-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .scout-filters {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .scout-filters .filter-group label {
+    font-size: 11px;
+  }
+
+  .scout-filters .filter-group select {
+    font-size: 13px;
+    padding: 8px 28px 8px 10px;
+  }
+
+  .scout-content {
+    padding: 0 8px;
+    gap: 12px;
+  }
+
+  .scout-header-card {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .scout-team-info .team-logo-wrapper {
+    width: 48px;
+    height: 48px;
+  }
+
+  .scout-team-name {
+    font-size: 16px;
+  }
+
+  .scout-team-conference {
+    font-size: 12px;
+  }
+
+  .scout-records {
+    gap: 12px;
+  }
+
+  .scout-record .record-label {
+    font-size: 10px;
+  }
+
+  .scout-record .record-value {
+    font-size: 16px;
+  }
+
+  .scout-section {
+    border-radius: 8px;
+  }
+
+  .scout-section-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .scout-section-header h3 {
+    font-size: 14px;
+  }
+
+  .scout-stat-group-selector select {
+    font-size: 12px;
+    padding: 6px 24px 6px 10px;
+  }
+
+  .scout-splits-table,
+  .scout-schedule-table {
+    min-width: 500px;
+  }
+
+  .scout-splits-table th,
+  .scout-splits-table td,
+  .scout-schedule-table th,
+  .scout-schedule-table td {
+    padding: 8px 8px;
+    font-size: 11px;
+  }
+
+  .scout-splits-table th,
+  .scout-schedule-table th {
+    font-size: 9px;
+  }
+
+  /* Charts mobile */
+  .scout-charts-row {
+    gap: 12px;
+  }
+
+  .radar-container,
+  .trajectory-container {
+    padding: 14px;
+  }
+
+  .radar-header h3,
+  .trajectory-header h3 {
+    font-size: 14px;
+  }
+
+  /* Insights mobile */
+  .scout-insights-section {
+    margin-top: 16px;
+  }
+
+  .scout-insights-card {
+    padding: 14px;
+    border-radius: 8px;
+  }
+
+  .insights-title {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .insights-list {
+    gap: 8px;
+  }
+
+  .insight-item {
+    padding: 10px;
+    border-radius: 6px;
+  }
+
+  .insight-stat {
+    font-size: 12px;
+  }
+
+  .insight-percentile {
+    font-size: 10px;
+  }
+
+  .insight-badge {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+}

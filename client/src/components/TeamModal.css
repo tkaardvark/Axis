@@ -114,6 +114,34 @@
   color: var(--color-text-primary);
 }
 
+/* Scout Link */
+.modal-scout-link {
+  padding: 12px 24px;
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-tertiary);
+}
+
+.scout-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-accent-primary);
+  background: transparent;
+  border: 1px solid var(--color-accent-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scout-link-btn:hover {
+  background: var(--color-accent-primary);
+  color: var(--color-text-on-accent);
+}
+
 /* Modal Filters */
 .modal-filters {
   display: flex;
@@ -360,6 +388,41 @@
   border-radius: 4px;
   display: inline-block;
   min-width: 24px;
+}
+
+/* Predicted result styling */
+.result-predicted {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.result-predicted.result-win {
+  color: var(--color-win-text);
+  background-color: var(--color-win-bg);
+  border: 1px dashed var(--color-win-text);
+}
+
+.result-predicted.result-loss {
+  color: var(--color-loss-text);
+  background-color: var(--color-loss-bg);
+  border: 1px dashed var(--color-loss-text);
+}
+
+.result-predicted .win-prob {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.score-predicted {
+  font-style: italic;
+  opacity: 0.7;
+  color: var(--color-text-secondary);
 }
 
 .location-badge {

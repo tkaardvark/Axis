@@ -61,6 +61,17 @@ function LogoPoint(props) {
 function TrapezoidChart({ teams, onTeamClick }) {
   // Force re-render on theme change so colors update
   const { theme } = useTheme();
+  
+  // Track when colors should be re-read (after CSS variables have updated)
+  const [colorVersion, setColorVersion] = useState(0);
+  
+  // Delay color reading to ensure CSS variables have propagated
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setColorVersion(v => v + 1);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [theme]);
 
   const chartData = useMemo(() => {
     return teams.map(team => ({
@@ -132,12 +143,12 @@ function TrapezoidChart({ teams, onTeamClick }) {
     ];
   }, [chartData, meanPace]);
 
-  // Read theme colors (re-reads when `theme` changes)
+  // Read theme colors (re-reads when `colorVersion` changes after CSS update)
   const colors = useMemo(() => ({
     text: getThemeColor('--color-text-secondary'),
     grid: getThemeColor('--color-border-tertiary'),
     refLine: getThemeColor('--color-text-tertiary'),
-  }), [theme]);
+  }), [colorVersion]);
 
   const renderShape = useCallback((props) => {
     return <LogoPoint {...props} onTeamClick={onTeamClick} />;

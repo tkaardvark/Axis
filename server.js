@@ -898,6 +898,105 @@ app.get('/api/teams/:teamId/splits', async (req, res) => {
   }
 });
 
+// Get team percentile ranks (national and conference)
+app.get('/api/teams/:teamId/percentiles', async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const { season = DEFAULT_SEASON } = req.query;
+
+    // Get the team's conference
+    const teamResult = await pool.query(
+      'SELECT conference, league FROM teams WHERE team_id = $1 AND season = $2',
+      [teamId, season]
+    );
+
+    if (teamResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    const { conference, league } = teamResult.rows[0];
+
+    // Get all teams' stats for percentile calculation
+    const result = await calculateDynamicStats(pool, {
+      league,
+      gameType: 'all',
+      seasonType: 'all',
+      seasonSegment: 'all',
+      season,
+    });
+
+    const allTeams = result.rows;
+    const conferenceTeams = allTeams.filter(t => t.conference === conference);
+    const targetTeam = allTeams.find(t => t.team_id === teamId);
+
+    if (!targetTeam) {
+      return res.status(404).json({ error: 'Team stats not found' });
+    }
+
+    // Stats where HIGHER is better
+    const higherIsBetter = [
+      'offensive_rating', 'adjusted_offensive_rating', 'efg_pct', 'fg_pct', 'fg3_pct', 'ft_pct',
+      'three_pt_rate', 'ft_rate', 'oreb_pct', 'dreb_pct', 'ast_per_game', 'stl_per_game',
+      'blk_per_game', 'reb_per_game', 'oreb_per_game', 'dreb_per_game', 'points_per_game',
+      'net_rating', 'adjusted_net_rating', 'win_pct', 'naia_win_pct',
+      'pts_paint_per_game', 'pts_fastbreak_per_game', 'pts_off_to_per_game', 'pts_bench_per_game',
+      'turnover_pct_opp', // forcing opponent turnovers is good
+      'pace', // higher pace is generally neutral, but keep consistent
+    ];
+
+    // Stats where LOWER is better
+    const lowerIsBetter = [
+      'defensive_rating', 'adjusted_defensive_rating', 'points_allowed_per_game',
+      'turnover_pct', 'to_per_game',
+      'efg_pct_opp', 'fg_pct_opp', 'fg3_pct_opp', // lower opponent shooting is better
+      'oreb_pct_opp', // lower opponent offensive rebounding is better
+      'opp_pts_paint_per_game', // lower opponent paint points is better
+    ];
+
+    // Calculate percentile for a stat
+    const calculatePercentile = (teamValue, allValues, higherBetter) => {
+      if (teamValue === null || teamValue === undefined) return null;
+      const validValues = allValues.filter(v => v !== null && v !== undefined && !isNaN(v));
+      if (validValues.length === 0) return null;
+
+      const val = parseFloat(teamValue);
+      let countBelow;
+      if (higherBetter) {
+        countBelow = validValues.filter(v => parseFloat(v) < val).length;
+      } else {
+        countBelow = validValues.filter(v => parseFloat(v) > val).length;
+      }
+      return Math.round((countBelow / validValues.length) * 100);
+    };
+
+    // Build percentile data for all relevant stats
+    const statKeys = [...higherIsBetter, ...lowerIsBetter];
+    const nationalPercentiles = {};
+    const conferencePercentiles = {};
+
+    statKeys.forEach(key => {
+      const higherBetter = higherIsBetter.includes(key);
+      const nationalValues = allTeams.map(t => t[key]);
+      const confValues = conferenceTeams.map(t => t[key]);
+
+      nationalPercentiles[key] = calculatePercentile(targetTeam[key], nationalValues, higherBetter);
+      conferencePercentiles[key] = calculatePercentile(targetTeam[key], confValues, higherBetter);
+    });
+
+    res.json({
+      team_id: teamId,
+      conference,
+      national_count: allTeams.length,
+      conference_count: conferenceTeams.length,
+      national: nationalPercentiles,
+      conference: conferencePercentiles,
+    });
+  } catch (err) {
+    console.error('Error fetching team percentiles:', err);
+    res.status(500).json({ error: 'Failed to fetch team percentiles' });
+  }
+});
+
 // Get team schedule (all games - completed and future)
 app.get('/api/teams/:teamId/schedule', async (req, res) => {
   try {
@@ -910,17 +1009,46 @@ app.get('/api/teams/:teamId/schedule', async (req, res) => {
     );
     const teamLeague = teamInfo.rows[0]?.league || 'mens';
 
-    // Get RPI rankings for all teams in this league
+    // Get RPI rankings for all teams in this league (use latest date_calculated)
     const rpiResult = await pool.query(
       `SELECT t.team_id, tr.rpi
        FROM teams t
-       JOIN team_ratings tr ON t.team_id = tr.team_id AND tr.season = $2
+       JOIN team_ratings tr ON t.team_id = tr.team_id 
+         AND tr.season = $2
+         AND tr.date_calculated = (SELECT MAX(date_calculated) FROM team_ratings WHERE season = $2)
        WHERE t.league = $1 AND t.season = $2 AND tr.rpi IS NOT NULL
        ORDER BY tr.rpi DESC`,
       [teamLeague, season]
     );
     const rpiRanks = {};
     rpiResult.rows.forEach((r, i) => { rpiRanks[r.team_id] = i + 1; });
+
+    // Get team ratings for predictions (adjusted offensive/defensive ratings)
+    const ratingsResult = await pool.query(
+      `SELECT t.team_id, 
+              tr.adjusted_offensive_rating,
+              tr.adjusted_defensive_rating,
+              tr.pace
+       FROM teams t
+       JOIN team_ratings tr ON t.team_id = tr.team_id 
+         AND tr.season = $2
+         AND tr.date_calculated = (SELECT MAX(date_calculated) FROM team_ratings WHERE season = $2)
+       WHERE t.league = $1 AND t.season = $2`,
+      [teamLeague, season]
+    );
+    const teamRatings = {};
+    ratingsResult.rows.forEach(r => {
+      teamRatings[r.team_id] = {
+        adjO: parseFloat(r.adjusted_offensive_rating) || 100,
+        adjD: parseFloat(r.adjusted_defensive_rating) || 100,
+        pace: parseFloat(r.pace) || 70
+      };
+    });
+
+    // Calculate league average pace for predictions
+    const leagueAvgPace = ratingsResult.rows.length > 0
+      ? ratingsResult.rows.reduce((sum, r) => sum + (parseFloat(r.pace) || 70), 0) / ratingsResult.rows.length
+      : 70;
 
     const gamesResult = await pool.query(
       `SELECT
@@ -984,6 +1112,48 @@ app.get('/api/teams/:teamId/schedule', async (req, res) => {
         ? getQuadrant(oppRpiRank, g.location)
         : null;
 
+      // Calculate predictions for future games
+      let prediction = null;
+      if (!g.is_completed && g.opponent_id && teamRatings[teamId] && teamRatings[g.opponent_id]) {
+        const team = teamRatings[teamId];
+        const opp = teamRatings[g.opponent_id];
+        
+        // Home court advantage (approximately 3.5 points in college basketball)
+        const homeAdv = g.location === 'home' ? 3.5 : (g.location === 'away' ? -3.5 : 0);
+        
+        // Expected efficiency margin per 100 possessions
+        // Net rating difference: (team's net rating) - (opponent's net rating)
+        const teamNet = team.adjO - team.adjD;
+        const oppNet = opp.adjO - opp.adjD;
+        const expectedMarginPer100 = teamNet - oppNet;
+        
+        // Estimate game pace (average of both teams' pace)
+        const expectedPace = (team.pace + opp.pace) / 2;
+        
+        // Scale margin from per-100-possessions to actual game
+        // A typical game has ~70 possessions, so multiply by pace/100
+        const paceFactor = expectedPace / 100;
+        const predictedMargin = Math.round((expectedMarginPer100 * paceFactor + homeAdv) * 10) / 10;
+        
+        // Calculate win probability using logistic function
+        // Standard deviation of game outcomes is roughly 11 points
+        const winProb = Math.round(100 / (1 + Math.exp(-predictedMargin / 5)));
+        
+        // Calculate predicted scores
+        // Average league scoring is roughly 75 points per game
+        const avgScore = 75;
+        const teamPredScore = Math.round(avgScore + predictedMargin / 2);
+        const oppPredScore = Math.round(avgScore - predictedMargin / 2);
+        
+        prediction = {
+          margin: predictedMargin,
+          win_probability: winProb,
+          team_score: teamPredScore,
+          opponent_score: oppPredScore,
+          predicted_result: predictedMargin > 0 ? 'W' : 'L'
+        };
+      }
+
       return {
         game_id: g.game_id,
         date: g.game_date,
@@ -1001,7 +1171,7 @@ app.get('/api/teams/:teamId/schedule', async (req, res) => {
         result: g.is_completed ? (g.team_score > g.opponent_score ? 'W' : 'L') : null,
         quadrant,
         opponent_rpi_rank: oppRpiRank,
-        net_rating: netRating
+        prediction
       };
     });
 

@@ -24,7 +24,7 @@ function Insights({ teams, league, season, loading, onTeamClick }) {
     return (
       <main className="main-content insights-page">
         <div className="page-header">
-          <h1>NAIA {leagueLabel} Basketball Insights</h1>
+          <h1>Insights</h1>
         </div>
         <div className="loading">Loading insights...</div>
       </main>
@@ -34,8 +34,8 @@ function Insights({ teams, league, season, loading, onTeamClick }) {
   return (
     <main className="main-content insights-page">
       <div className="page-header">
-        <h1>NAIA {leagueLabel} Basketball Insights</h1>
-        <p className="page-subtitle">{season} season</p>
+        <h1>Insights</h1>
+        <p className="page-subtitle">Advanced visualizations and analytical deep dives into team performance</p>
       </div>
 
       <section className="insight-card">

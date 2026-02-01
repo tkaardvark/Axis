@@ -1,14 +1,15 @@
 .header-wrapper {
   display: flex;
   flex-direction: column;
+  background-color: var(--color-bg-header);
 }
 
-.header {
+/* Top bar - Logo | Last Updated | Theme Toggle */
+.header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background-color: var(--color-bg-header);
   border-bottom: 1px solid var(--color-border-primary);
 }
 
@@ -18,11 +19,22 @@
   flex: 1;
 }
 
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.header-right {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .logo-icon {
@@ -33,109 +45,15 @@
 
 .logo-text {
   font-family: var(--font-heading);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-.sport-selector select {
-  padding: 8px 32px 8px 12px;
-  border: 1px solid var(--color-border-primary);
-  border-radius: 4px;
-  background-color: var(--color-bg-secondary);
-  font-size: 14px;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%232c2c2c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-}
-
-/* Primary Navigation - Men's / Women's */
-.primary-nav {
-  display: flex;
-  gap: 48px;
-}
-
-.primary-nav-link {
-  font-family: var(--font-heading);
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  font-size: 18px;
-  font-weight: 600;
-  padding: 4px 0;
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s, border-color 0.2s;
-}
-
-.primary-nav-link:hover {
-  color: var(--color-text-primary);
-}
-
-.primary-nav-link.active {
-  color: var(--color-text-primary);
-  border-bottom-color: var(--color-accent-primary);
-}
-
-/* Secondary Navigation - Teams / Bracketcast */
-.secondary-nav {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  padding: 8px 24px;
-  background-color: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border-primary);
-}
-
-.secondary-nav-link {
-  font-family: var(--font-heading);
-  color: var(--color-text-secondary);
-  text-decoration: none;
+.last-updated {
+  font-family: var(--font-mono);
   font-size: 13px;
-  font-weight: 500;
-  padding: 4px 12px;
-  border-radius: 4px;
-  transition: color 0.2s, background-color 0.2s;
-}
-
-.secondary-nav-link:hover {
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-hover);
-}
-
-.secondary-nav-link.active {
-  color: var(--color-text-primary);
-  background-color: var(--color-bg-hover);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.season-selector select {
-  padding: 6px 28px 6px 10px;
-  border: 1px solid var(--color-border-primary);
-  border-radius: 6px;
-  background-color: var(--color-bg-secondary);
-  font-family: var(--font-heading);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%232c2c2c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s;
-}
-
-.season-selector select:hover {
-  border-color: var(--color-text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .theme-toggle {
@@ -162,20 +80,94 @@
   height: 20px;
 }
 
+/* Navigation bar - Dropdowns | Page buttons */
+.header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Dropdown selectors */
+.dropdown-selector select {
+  padding: 8px 36px 8px 14px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  background-color: var(--color-bg-primary);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dropdown-selector select:hover {
+  border-color: var(--color-text-tertiary);
+}
+
+.dropdown-selector select:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 2px rgba(200, 80, 50, 0.15);
+}
+
+/* Navigation buttons */
+.nav-button {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 24px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-button:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.nav-button.active {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-primary);
+}
+
+/* Mobile navigation dropdown - hidden by default */
+.nav-dropdown-mobile {
+  display: none;
+}
+
 /* Mobile styles */
-@media (max-width: 600px) {
-  .header {
-    padding: 10px 12px;
-    flex-wrap: wrap;
-    gap: 8px;
+@media (max-width: 768px) {
+  .header-top {
+    padding: 10px 16px;
   }
 
-  .header-left {
-    flex: 0 0 auto;
-  }
-
-  .logo {
-    gap: 4px;
+  .header-center {
+    display: none;
   }
 
   .logo-icon {
@@ -185,18 +177,6 @@
 
   .logo-text {
     font-size: 18px;
-  }
-
-  .primary-nav {
-    gap: 24px;
-  }
-
-  .primary-nav-link {
-    font-size: 15px;
-  }
-
-  .header-right {
-    flex: 0 0 auto;
   }
 
   .theme-toggle {
@@ -209,13 +189,82 @@
     height: 18px;
   }
 
-  .secondary-nav {
-    padding: 6px 12px;
+  .header-nav {
+    padding: 10px 16px;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
-  .secondary-nav-link {
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  /* Hide desktop nav buttons on mobile */
+  .nav-right {
+    display: none;
+  }
+
+  /* Show mobile nav dropdown */
+  .nav-dropdown-mobile {
+    display: block;
+    margin-left: auto;
+  }
+
+  .dropdown-selector select {
+    padding: 8px 32px 8px 12px;
+    font-size: 13px;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-top {
+    padding: 8px 12px;
+  }
+
+  .logo-text {
+    font-size: 15px;
+  }
+
+  .logo-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .theme-toggle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .header-nav {
+    padding: 8px 12px;
+  }
+
+  .nav-left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .dropdown-selector {
+    width: 100%;
+  }
+
+  .dropdown-selector select {
+    width: 100%;
+    padding: 8px 28px 8px 10px;
     font-size: 12px;
-    padding: 4px 10px;
+    background-position: right 8px center;
+  }
+
+  /* Page dropdown goes full width on second row */
+  .nav-dropdown-mobile {
+    grid-column: 1 / -1;
+    margin-left: 0;
   }
 }

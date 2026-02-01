@@ -25,10 +25,25 @@
   margin: 0;
 }
 
+/* Tablet and smaller */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 0;
+  }
+
+  .page-header {
+    padding: 16px 16px 0;
+  }
+
+  .page-header h1 {
+    font-size: 22px;
+  }
+}
+
 /* Mobile styles */
 @media (max-width: 600px) {
   .page-header {
-    padding: 16px 16px 0;
+    padding: 12px 12px 0;
   }
 
   .page-header h1 {
@@ -37,5 +52,12 @@
 
   .last-updated {
     font-size: 12px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .page-header h1 {
+    font-size: 18px;
   }
 }

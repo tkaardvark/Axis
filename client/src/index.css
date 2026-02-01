@@ -29,6 +29,11 @@
   --color-accent-primary: #c75a3a;
   --color-accent-primary-hover: #b04e31;
 
+  /* Chart colors - high contrast for data viz */
+  --color-chart-line: #2563eb;
+  --color-chart-dot: #2563eb;
+  --color-chart-fill: rgba(37, 99, 235, 0.2);
+
   /* Borders */
   --color-border-primary: #d4d0c8;
   --color-border-secondary: #e0dcd4;
@@ -154,6 +159,11 @@
   --color-accent-primary: #e07050;
   --color-accent-primary-hover: #d05e40;
 
+  /* Chart colors - bright for dark mode contrast */
+  --color-chart-line: #60a5fa;
+  --color-chart-dot: #60a5fa;
+  --color-chart-fill: rgba(96, 165, 250, 0.25);
+
   /* Borders */
   --color-border-primary: #404040;
   --color-border-secondary: #383838;
@@ -258,4 +268,36 @@ a {
 
 button {
   font-family: var(--font-body);
+}
+
+/* Global mobile improvements */
+@media (max-width: 768px) {
+  /* Prevent text size adjustment on orientation change */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Better touch targets for all buttons */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Ensure inputs are large enough for touch */
+  input, select, textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Improve scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Even smaller screens */
+  body {
+    font-size: 14px;
+  }
 }

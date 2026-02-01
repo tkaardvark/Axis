@@ -7,6 +7,7 @@ import TeamsTable from './components/TeamsTable';
 import TeamModal from './components/TeamModal';
 import Bracketcast from './components/Bracketcast';
 import Insights from './components/Insights';
+import Scout from './components/Scout';
 import './App.css';
 
 // In production, API is served from same origin (empty string)
@@ -82,6 +83,7 @@ function App() {
     const path = location.pathname;
     if (path.startsWith('/bracketcast')) return 'bracketcast';
     if (path.startsWith('/insights')) return 'insights';
+    if (path.startsWith('/scout')) return 'scout';
     return 'teams';
   };
 
@@ -98,19 +100,22 @@ function App() {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [seasonsRes, conferencesRes, monthsRes] = await Promise.all([
+        const [seasonsRes, conferencesRes, monthsRes, lastUpdatedRes] = await Promise.all([
           fetch(`${API_URL}/api/seasons?league=${league}`),
           fetch(`${API_URL}/api/conferences?league=${league}&season=${season}`),
           fetch(`${API_URL}/api/months?league=${league}&season=${season}`),
+          fetch(`${API_URL}/api/last-updated?league=${league}&season=${season}`),
         ]);
         
         const seasonsData = await seasonsRes.json();
         const conferencesData = await conferencesRes.json();
         const monthsData = await monthsRes.json();
+        const lastUpdatedData = await lastUpdatedRes.json();
         
         setSeasons(seasonsData || []);
         setConferences(conferencesData || []);
         setMonths(monthsData || []);
+        setLastUpdated(lastUpdatedData.lastUpdated || null);
       } catch (error) {
         console.error('Error fetching metadata:', error);
       }
@@ -180,9 +185,15 @@ function App() {
     });
   };
 
+  const leagueLabel = league === 'mens' ? "Men's" : "Women's";
+
   // Teams page content
   const TeamsPage = () => (
     <>
+      <div className="page-header">
+        <h1>Teams</h1>
+        <p className="page-subtitle">Compare team statistics, ratings, and performance metrics across the {leagueLabel.toLowerCase()} division</p>
+      </div>
       <FilterBar
         conferences={conferences}
         months={months}
@@ -241,6 +252,17 @@ function App() {
                 league={league}
                 season={season}
                 onTeamClick={handleTeamClick}
+              />
+            }
+          />
+          <Route
+            path="/scout"
+            element={
+              <Scout
+                league={league}
+                season={season}
+                teams={teams}
+                conferences={conferences}
               />
             }
           />

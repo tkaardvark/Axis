@@ -185,7 +185,7 @@ function Bracketcast({ league, season, onTeamClick }) {
     return (
       <main className="main-content bracketcast-page">
         <div className="page-header">
-          <h1>NAIA {league === 'mens' ? "Men's" : "Women's"} Basketball Bracketcast</h1>
+          <h1>Bracketcast</h1>
         </div>
         <div className="loading">Loading bracketcast data...</div>
       </main>
@@ -195,8 +195,8 @@ function Bracketcast({ league, season, onTeamClick }) {
   return (
     <main className="main-content bracketcast-page">
       <div className="page-header">
-        <h1>NAIA {league === 'mens' ? "Men's" : "Women's"} Basketball Bracketcast</h1>
-        <p className="page-subtitle">Selection Committee Criteria & Bracket Projection</p>
+        <h1>Bracketcast</h1>
+        <p className="page-subtitle">Selection committee criteria rankings and projected 64-team national tournament bracket</p>
       </div>
 
       <div className="view-toggle">

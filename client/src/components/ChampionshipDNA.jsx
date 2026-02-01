@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -60,6 +60,17 @@ function LogoPoint(props) {
 
 function ChampionshipDNA({ teams, onTeamClick }) {
   const { theme } = useTheme();
+  
+  // Track when colors should be re-read (after CSS variables have updated)
+  const [colorVersion, setColorVersion] = useState(0);
+  
+  // Delay color reading to ensure CSS variables have propagated
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setColorVersion(v => v + 1);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [theme]);
 
   const chartData = useMemo(() => {
     return teams.map(team => ({
@@ -90,7 +101,7 @@ function ChampionshipDNA({ teams, onTeamClick }) {
     text: getThemeColor('--color-text-secondary'),
     grid: getThemeColor('--color-border-tertiary'),
     refLine: getThemeColor('--color-text-tertiary'),
-  }), [theme]);
+  }), [colorVersion]);
 
   const renderShape = useCallback((props) => {
     return <LogoPoint {...props} onTeamClick={onTeamClick} />;

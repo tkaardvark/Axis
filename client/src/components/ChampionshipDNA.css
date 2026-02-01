@@ -32,8 +32,37 @@
   font-size: 14px;
 }
 
+/* Tablet */
+@media (max-width: 768px) {
+  .dna-chart-container {
+    height: 450px;
+  }
+}
+
+/* Mobile */
 @media (max-width: 600px) {
   .dna-chart-container {
     height: 350px;
+  }
+
+  .dna-tooltip {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .dna-tooltip .tooltip-stat {
+    font-size: 11px;
+  }
+
+  .dna-empty {
+    padding: 32px 16px;
+    font-size: 13px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .dna-chart-container {
+    height: 280px;
   }
 }

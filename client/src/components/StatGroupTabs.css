@@ -43,6 +43,20 @@
   color: var(--color-text-inverted);
 }
 
+/* Tablet styles */
+@media (max-width: 768px) {
+  .stat-group-tabs {
+    padding: 0 16px 14px;
+    gap: 6px;
+  }
+
+  .stat-group-tab {
+    padding: 8px 14px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+}
+
 /* Mobile styles */
 @media (max-width: 600px) {
   .stat-group-tabs {
@@ -51,7 +65,23 @@
   }
 
   .stat-group-tab {
-    padding: 6px 12px;
+    padding: 8px 12px;
     font-size: 12px;
+    min-height: 36px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .stat-group-tabs {
+    padding: 0 8px 10px;
+    gap: 4px;
+  }
+
+  .stat-group-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+    min-height: 32px;
+    border-radius: 16px;
   }
 }

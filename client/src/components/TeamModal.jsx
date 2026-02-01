@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import './TeamModal.css';
 import TeamLogo from './TeamLogo';
 
@@ -77,10 +78,20 @@ const STAT_GROUPS = {
 };
 
 function TeamModal({ team, season = '2025-26', onClose }) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [splits, setSplits] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statGroup, setStatGroup] = useState('Overview');
+
+  const handleViewScoutReport = () => {
+    // Navigate to scout page with current params and team selection
+    const params = new URLSearchParams(searchParams);
+    params.set('team', team.team_id);
+    navigate(`/scout?${params.toString()}`);
+    onClose();
+  };
 
   useEffect(() => {
     if (!team) return;
@@ -197,6 +208,13 @@ function TeamModal({ team, season = '2025-26', onClose }) {
           </div>
         </div>
 
+        {/* Scout Report Link */}
+        <div className="modal-scout-link">
+          <button className="scout-link-btn" onClick={handleViewScoutReport}>
+            View Full Scout Report →
+          </button>
+        </div>
+
         {/* Scrollable content area */}
         <div className="modal-body">
           {/* Stat Group Selector */}
@@ -261,7 +279,6 @@ function TeamModal({ team, season = '2025-26', onClose }) {
                     <th className="col-quad">Quad</th>
                     <th className="col-result">Result</th>
                     <th className="col-score">Score</th>
-                    <th className="col-net-rating">NET</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -293,17 +310,21 @@ function TeamModal({ team, season = '2025-26', onClose }) {
                           <span className={`result-${game.result === 'W' ? 'win' : 'loss'}`}>
                             {game.result}
                           </span>
+                        ) : game.prediction ? (
+                          <span className={`result-predicted result-${game.prediction.predicted_result === 'W' ? 'win' : 'loss'}`}>
+                            {game.prediction.predicted_result}
+                            <span className="win-prob">{game.prediction.win_probability}%</span>
+                          </span>
                         ) : (
                           <span className="result-upcoming">-</span>
                         )}
                       </td>
                       <td className="col-score">
-                        {game.is_completed ? `${game.team_score}-${game.opponent_score}` : '-'}
-                      </td>
-                      <td className="col-net-rating">
-                        {game.is_completed && game.net_rating !== null ? (
-                          <span className={game.net_rating >= 0 ? 'net-positive' : 'net-negative'}>
-                            {game.net_rating > 0 ? '+' : ''}{game.net_rating.toFixed(1)}
+                        {game.is_completed ? (
+                          `${game.team_score}-${game.opponent_score}`
+                        ) : game.prediction ? (
+                          <span className="score-predicted">
+                            {game.prediction.team_score}-{game.prediction.opponent_score}
                           </span>
                         ) : '-'}
                       </td>
