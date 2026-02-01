@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useId } from 'react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -24,8 +24,9 @@ function ChartTooltip({ active, payload, config }) {
 }
 
 function LogoPoint(props) {
-  const { cx, cy, payload, onTeamClick } = props;
+  const { cx, cy, payload, onTeamClick, chartId } = props;
   const size = 28;
+  const clipId = `clip-${chartId}-${payload.team_id}`;
 
   return (
     <g
@@ -37,7 +38,7 @@ function LogoPoint(props) {
     >
       {payload.logo_url ? (
         <>
-          <clipPath id={`clip-scatter-${payload.team_id}`}>
+          <clipPath id={clipId}>
             <circle cx={cx} cy={cy} r={size / 2} />
           </clipPath>
           <image
@@ -46,7 +47,7 @@ function LogoPoint(props) {
             y={cy - size / 2}
             width={size}
             height={size}
-            clipPath={`url(#clip-scatter-${payload.team_id})`}
+            clipPath={`url(#${clipId})`}
             preserveAspectRatio="xMidYMid meet"
           />
         </>
@@ -83,6 +84,7 @@ function InsightScatterChart({
 }) {
   const { theme } = useTheme();
   const [colorVersion, setColorVersion] = useState(0);
+  const chartId = useId(); // Unique ID for this chart instance
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -187,7 +189,7 @@ function InsightScatterChart({
           )}
           <Scatter
             data={chartData}
-            shape={(props) => <LogoPoint {...props} onTeamClick={onTeamClick} />}
+            shape={(props) => <LogoPoint {...props} onTeamClick={onTeamClick} chartId={chartId} />}
           />
         </ScatterChart>
       </ResponsiveContainer>
