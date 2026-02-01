@@ -13,51 +13,79 @@ const TABS = [
   { id: 'pace', label: 'Pace & Style' },
 ];
 
-function Insights({ teams, league, season, loading, onTeamClick }) {
+// Filter options for team count
+const FILTER_OPTIONS = [
+  { value: 'top64', label: 'Top 64 Teams' },
+  { value: 'top128', label: 'Top 128 Teams' },
+  { value: 'all', label: 'All Teams' },
+];
+
+function Insights({ teams, conferences = [], league, season, loading, onTeamClick }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [filter, setFilter] = useState('top64'); // Default to top 64
+
+  // Get the filter limit or conference name
+  const getFilterLimit = (filterValue) => {
+    if (filterValue === 'top64') return 64;
+    if (filterValue === 'top128') return 128;
+    if (filterValue === 'all') return Infinity;
+    return Infinity; // Conference filter - no limit
+  };
+
+  const isConferenceFilter = (filterValue) => {
+    return !['top64', 'top128', 'all'].includes(filterValue);
+  };
+
+  // Base filtered teams (by conference or top N)
+  const baseFilteredTeams = useMemo(() => {
+    if (!teams || teams.length === 0) return [];
+    
+    let filtered = [...teams];
+    
+    // If filtering by conference
+    if (isConferenceFilter(filter)) {
+      filtered = filtered.filter(t => t.conference === filter);
+    }
+    
+    // Sort by adjusted_net_rating (best first)
+    filtered.sort((a, b) => (b.adjusted_net_rating || 0) - (a.adjusted_net_rating || 0));
+    
+    // Apply limit
+    const limit = getFilterLimit(filter);
+    return filtered.slice(0, limit);
+  }, [teams, filter]);
 
   // Filter teams with required stats for each visualization
   const topTeams = useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    return teams
-      .filter(t => t.adjusted_net_rating != null && t.pace != null)
-      .slice(0, 120);
-  }, [teams]);
+    return baseFilteredTeams
+      .filter(t => t.adjusted_net_rating != null && t.pace != null);
+  }, [baseFilteredTeams]);
 
   const top40 = useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    return teams
+    return baseFilteredTeams
       .filter(t => t.adjusted_net_rating != null && t.adjusted_offensive_rating != null && t.adjusted_defensive_rating != null)
       .slice(0, 40);
-  }, [teams]);
+  }, [baseFilteredTeams]);
 
   const shootingTeams = useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    return teams
-      .filter(t => t.three_pt_rate != null && t.fg3_pct != null && t.ft_rate != null && t.ft_pct != null)
-      .slice(0, 120);
-  }, [teams]);
+    return baseFilteredTeams
+      .filter(t => t.three_pt_rate != null && t.fg3_pct != null && t.ft_rate != null && t.ft_pct != null);
+  }, [baseFilteredTeams]);
 
   const reboundingTeams = useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    return teams
-      .filter(t => t.oreb_pct != null && t.dreb_pct != null)
-      .slice(0, 120);
-  }, [teams]);
+    return baseFilteredTeams
+      .filter(t => t.oreb_pct != null && t.dreb_pct != null);
+  }, [baseFilteredTeams]);
 
   const efficiencyTeams = useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    return teams
-      .filter(t => t.offensive_rating != null && t.defensive_rating != null && t.turnover_pct != null)
-      .slice(0, 120);
-  }, [teams]);
+    return baseFilteredTeams
+      .filter(t => t.offensive_rating != null && t.defensive_rating != null && t.turnover_pct != null);
+  }, [baseFilteredTeams]);
 
   const paceTeams = useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    return teams
-      .filter(t => t.pace != null && t.pts_paint_per_game != null && t.pts_fastbreak_per_game != null)
-      .slice(0, 120);
-  }, [teams]);
+    return baseFilteredTeams
+      .filter(t => t.pace != null && t.pts_paint_per_game != null && t.pts_fastbreak_per_game != null);
+  }, [baseFilteredTeams]);
 
   const leagueLabel = league === 'mens' ? "Men's" : "Women's";
 
@@ -83,17 +111,40 @@ function Insights({ teams, league, season, loading, onTeamClick }) {
         <p className="page-subtitle">Advanced visualizations and analytical deep dives into team performance</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="insights-tab-nav">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            className={`insights-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+      {/* Controls: Tabs + Filter */}
+      <div className="insights-controls">
+        <div className="insights-tab-nav">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              className={`insights-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="insights-filter">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="insights-filter-select"
           >
-            {tab.label}
-          </button>
-        ))}
+            <optgroup label="Top Teams">
+              {FILTER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </optgroup>
+            {conferences.length > 0 && (
+              <optgroup label="By Conference">
+                {conferences.map(conf => (
+                  <option key={conf} value={conf}>{conf}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
       </div>
 
       {/* Overview Tab */}

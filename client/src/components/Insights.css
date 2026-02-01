@@ -12,11 +12,19 @@
   margin: 4px 0 0;
 }
 
+/* Controls wrapper */
+.insights-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 0;
+}
+
 /* Tab Navigation */
 .insights-tab-nav {
   display: flex;
   gap: 8px;
-  padding: 20px 24px 0;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -49,6 +57,48 @@
   background-color: var(--color-accent-primary);
   border-color: var(--color-accent-primary);
   color: white;
+}
+
+/* Filter dropdown */
+.insights-filter {
+  flex-shrink: 0;
+}
+
+.insights-filter-select {
+  padding: 10px 32px 10px 14px;
+  border: 1px solid var(--color-border-secondary);
+  border-radius: 8px;
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: all 0.15s ease;
+}
+
+.insights-filter-select:hover {
+  border-color: var(--color-border-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.insights-filter-select:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+}
+
+.insights-filter-select optgroup {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.insights-filter-select option {
+  font-weight: 400;
+  color: var(--color-text-primary);
+  padding: 8px;
 }
 
 .insights-tab-content {
@@ -98,6 +148,11 @@
     padding: 20px 16px 0;
   }
 
+  .insights-controls {
+    padding: 16px 16px 0;
+    flex-wrap: wrap;
+  }
+
   .insight-card {
     margin: 20px 16px;
     padding: 20px;
@@ -107,12 +162,13 @@
     font-size: 17px;
   }
 
-  .insights-tab-nav {
-    padding: 16px 16px 0;
-  }
-
   .insights-tab-btn {
     padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .insights-filter-select {
+    padding: 8px 28px 8px 12px;
     font-size: 13px;
   }
 }
@@ -121,6 +177,26 @@
 @media (max-width: 600px) {
   .insights-page .page-header {
     padding: 16px 12px 0;
+  }
+
+  .insights-controls {
+    padding: 12px 12px 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .insights-tab-nav {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .insights-filter {
+    width: 100%;
+  }
+
+  .insights-filter-select {
+    width: 100%;
+    padding: 10px 32px 10px 14px;
   }
 
   .insight-card {
@@ -141,11 +217,6 @@
     font-size: 13px;
   }
 
-  .insights-tab-nav {
-    padding: 12px 12px 0;
-    gap: 6px;
-  }
-
   .insights-tab-btn {
     padding: 8px 14px;
     font-size: 12px;
@@ -158,6 +229,10 @@
     padding: 12px 8px 0;
   }
 
+  .insights-controls {
+    padding: 10px 8px 0;
+  }
+
   .insight-card {
     margin: 10px 8px;
     padding: 12px;
@@ -167,12 +242,13 @@
     font-size: 15px;
   }
 
-  .insights-tab-nav {
-    padding: 10px 8px 0;
-  }
-
   .insights-tab-btn {
     padding: 6px 12px;
     font-size: 11px;
+  }
+
+  .insights-filter-select {
+    font-size: 12px;
+    padding: 8px 28px 8px 12px;
   }
 }

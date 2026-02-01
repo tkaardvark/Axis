@@ -248,6 +248,7 @@ function App() {
             element={
               <Insights
                 teams={teams}
+                conferences={conferences}
                 loading={loading}
                 league={league}
                 season={season}
