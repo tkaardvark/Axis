@@ -25,9 +25,12 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
   }, [teams]);
 
   // Filter teams with required stats for each visualization
+  // Trapezoid of Excellence: limit to top 75 teams by RPI
   const topTeams = useMemo(() => {
     return baseFilteredTeams
-      .filter(t => t.adjusted_net_rating != null && t.pace != null);
+      .filter(t => t.adjusted_net_rating != null && t.pace != null && t.rpi != null)
+      .sort((a, b) => (b.rpi || 0) - (a.rpi || 0))  // Sort by RPI descending (higher is better)
+      .slice(0, 75);  // Top 75 by RPI
   }, [baseFilteredTeams]);
 
   const top40 = useMemo(() => {
@@ -102,7 +105,7 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
             <div className="insight-card-header">
               <h2 className="insight-title">Trapezoid of Excellence</h2>
               <p className="insight-description">
-                Pace vs. Adjusted Net Rating — top {topTeams.length} teams by AdjNET
+                Pace vs. Adjusted Net Rating — top {topTeams.length} teams by RPI
               </p>
             </div>
             <TrapezoidChart teams={topTeams} onTeamClick={onTeamClick} />

@@ -1463,9 +1463,28 @@ function getQuadrant(oppRpiRank, location) {
 // Get bracketcast data with quadrant records and seed projections
 app.get('/api/bracketcast', async (req, res) => {
   try {
-    const { league = 'mens', season = DEFAULT_SEASON } = req.query;
+    const { league = 'mens', season = DEFAULT_SEASON, asOfDate: userAsOfDate } = req.query;
+
+    // If user provides an asOfDate, use it; otherwise get the latest game date
+    let asOfDate;
+    if (userAsOfDate) {
+      // User-provided date - use end of that day (games on that date are included)
+      asOfDate = userAsOfDate;
+    } else {
+      // Get the latest completed game date
+      const asOfResult = await pool.query(`
+        SELECT MAX(game_date) as as_of_date
+        FROM games g
+        JOIN teams t ON g.team_id = t.team_id
+        WHERE t.league = $1
+          AND g.season = $2
+          AND g.is_completed = TRUE
+      `, [league, season]);
+      asOfDate = asOfResult.rows[0].as_of_date;
+    }
 
     // Step 1: Get all teams with their RPI and create RPI rankings
+    // Note: RPI from team_ratings is pre-calculated, but records will be filtered by date
     const teamsResult = await pool.query(`
       SELECT
         t.team_id,
@@ -1501,6 +1520,7 @@ app.get('/api/bracketcast', async (req, res) => {
 
     // Step 1b: Get total record (all games including non-NAIA, but only completed and non-exhibition)
     // Exclude national tournament games since bracketcast is for projecting seeds
+    // Filter by asOfDate if provided
     const totalRecordResult = await pool.query(`
       SELECT
         g.team_id,
@@ -1513,8 +1533,9 @@ app.get('/api/bracketcast', async (req, res) => {
         AND g.is_completed = TRUE
         AND g.is_exhibition = FALSE
         AND g.is_national_tournament = FALSE
+        AND ($3::date IS NULL OR g.game_date <= $3::date)
       GROUP BY g.team_id
-    `, [league, season]);
+    `, [league, season, asOfDate]);
 
     const totalRecords = {};
     totalRecordResult.rows.forEach(row => {
@@ -1526,6 +1547,7 @@ app.get('/api/bracketcast', async (req, res) => {
 
     // Step 1c: Get NAIA record from games table (using is_naia_game flag for consistency)
     // Exclude national tournament games since bracketcast is for projecting seeds
+    // Filter by asOfDate if provided
     const naiaRecordResult = await pool.query(`
       SELECT
         g.team_id,
@@ -1539,8 +1561,9 @@ app.get('/api/bracketcast', async (req, res) => {
         AND g.is_exhibition = FALSE
         AND g.is_naia_game = TRUE
         AND g.is_national_tournament = FALSE
+        AND ($3::date IS NULL OR g.game_date <= $3::date)
       GROUP BY g.team_id
-    `, [league, season]);
+    `, [league, season, asOfDate]);
 
     const naiaRecords = {};
     naiaRecordResult.rows.forEach(row => {
@@ -1562,6 +1585,7 @@ app.get('/api/bracketcast', async (req, res) => {
 
     // Step 2: Get all NAIA games for quadrant calculation
     // Exclude national tournament games since bracketcast is for projecting seeds
+    // Filter by asOfDate if provided
     const gamesResult = await pool.query(`
       SELECT
         g.team_id,
@@ -1577,7 +1601,8 @@ app.get('/api/bracketcast', async (req, res) => {
         AND g.is_naia_game = TRUE
         AND g.is_completed = TRUE
         AND g.is_national_tournament = FALSE
-    `, [league, season]);
+        AND ($3::date IS NULL OR g.game_date <= $3::date)
+    `, [league, season, asOfDate]);
 
     // Step 3: Calculate quadrant records for each team
     const quadrantRecords = {};
@@ -1913,6 +1938,7 @@ app.get('/api/bracketcast', async (req, res) => {
       teams: bracketcastTeams,
       bracket,
       pods,
+      asOfDate,
     });
   } catch (err) {
     console.error('Error fetching bracketcast:', err);

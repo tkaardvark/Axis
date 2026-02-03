@@ -60,12 +60,17 @@ function Bracketcast({ league, season, onTeamClick }) {
   const [view, setView] = useState('table'); // 'table', 'bracket', or 'pods'
   const [sort, setSort] = useState({ key: 'pr', dir: 'asc' });
   const [expandedTeams, setExpandedTeams] = useState(new Set()); // Track expanded teams in Seed Groups
+  const [asOfDate, setAsOfDate] = useState(''); // User-selected cutoff date (empty = use all data)
 
   useEffect(() => {
     const fetchBracketcast = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_URL}/api/bracketcast?league=${league}&season=${season}`);
+        let url = `${API_URL}/api/bracketcast?league=${league}&season=${season}`;
+        if (asOfDate) {
+          url += `&asOfDate=${asOfDate}`;
+        }
+        const response = await fetch(url);
         const result = await response.json();
         setData(result);
       } catch (error) {
@@ -76,7 +81,7 @@ function Bracketcast({ league, season, onTeamClick }) {
     };
 
     fetchBracketcast();
-  }, [league, season]);
+  }, [league, season, asOfDate]);
 
   const handleSort = (col) => {
     const sortKey = col.sortKey || col.key;
@@ -181,6 +186,18 @@ function Bracketcast({ league, season, onTeamClick }) {
     });
   };
 
+  // Format the as of date
+  const formattedAsOfDate = useMemo(() => {
+    if (!data.asOfDate) return null;
+    const date = new Date(data.asOfDate);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }, [data.asOfDate]);
+
   if (loading) {
     return (
       <main className="main-content bracketcast-page">
@@ -199,25 +216,47 @@ function Bracketcast({ league, season, onTeamClick }) {
         <p className="page-subtitle">Selection committee criteria rankings and projected 64-team national tournament bracket</p>
       </div>
 
-      <div className="view-toggle">
-        <button
-          className={`view-btn ${view === 'table' ? 'active' : ''}`}
-          onClick={() => setView('table')}
-        >
-          Selection Table
-        </button>
-        <button
-          className={`view-btn ${view === 'pods' ? 'active' : ''}`}
-          onClick={() => setView('pods')}
-        >
-          Opening Round Pods
-        </button>
-        <button
-          className={`view-btn ${view === 'bracket' ? 'active' : ''}`}
-          onClick={() => setView('bracket')}
-        >
-          Seed Groups
-        </button>
+      <div className="bracketcast-controls">
+        <div className="view-toggle">
+          <button
+            className={`view-btn ${view === 'table' ? 'active' : ''}`}
+            onClick={() => setView('table')}
+          >
+            Selection Table
+          </button>
+          <button
+            className={`view-btn ${view === 'pods' ? 'active' : ''}`}
+            onClick={() => setView('pods')}
+          >
+            Opening Round Pods
+          </button>
+          <button
+            className={`view-btn ${view === 'bracket' ? 'active' : ''}`}
+            onClick={() => setView('bracket')}
+          >
+            Seed Groups
+          </button>
+        </div>
+
+        <div className="date-filter">
+          <label htmlFor="asOfDate">As of Date:</label>
+          <input
+            type="date"
+            id="asOfDate"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+          />
+          {asOfDate && (
+            <button 
+              className="clear-date-btn"
+              onClick={() => setAsOfDate('')}
+              title="Clear date filter"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {view === 'table' ? (

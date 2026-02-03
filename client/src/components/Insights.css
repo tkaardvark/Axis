@@ -28,6 +28,8 @@
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
 }
 
 .insights-tab-nav::-webkit-scrollbar {
@@ -46,6 +48,9 @@
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
+  flex-shrink: 0;
+  flex-grow: 0;
+  width: auto;
 }
 
 .insights-tab-btn:hover {
@@ -185,11 +190,16 @@
     padding: 0 12px 12px;
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
   }
 
   .insights-tab-nav {
     width: 100%;
     gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
   }
 
   .insights-filter {
@@ -222,7 +232,9 @@
   .insights-tab-btn {
     padding: 8px 12px;
     font-size: 12px;
-    min-height: 36px;
+    flex-shrink: 0;
+    flex-grow: 0;
+    width: auto;
   }
 }
 
@@ -234,6 +246,12 @@
 
   .insights-controls {
     padding: 0 8px 10px;
+  }
+
+  .insights-tab-nav {
+    margin: 0 -8px;
+    padding: 0 8px 4px;
+    width: calc(100% + 16px);
   }
 
   .insight-card {
@@ -248,8 +266,10 @@
   .insights-tab-btn {
     padding: 6px 10px;
     font-size: 11px;
-    min-height: 32px;
     border-radius: 16px;
+    flex-shrink: 0;
+    flex-grow: 0;
+    width: auto;
   }
 
   .insights-filter-select {
