@@ -28,6 +28,17 @@ const CONCURRENT_REQUESTS = 5;  // Fetch 5 teams at a time
 const DELAY_BETWEEN_BATCHES = 300;  // ms
 
 /**
+ * EXCLUDED TEAMS - Teams to skip during import
+ * These are non-NAIA members or teams not in the official RPI list.
+ * Match is case-insensitive and checks if team name contains the string.
+ */
+const EXCLUDED_TEAMS = [
+  'Antelope Valley',      // Not an NAIA member - NAIA-independent/non-member school
+  'Point Park',           // Not in the NAIA men's basketball RPI list
+  'Saint Katherine',      // Not in the NAIA men's basketball RPI list (CA)
+];
+
+/**
  * Make an HTTPS GET request and return JSON
  */
 function fetchJson(url) {
@@ -230,10 +241,23 @@ function extractGames(json, teamId) {
     const isNationalTournament = isPostseason && gameDate.getMonth() === 2 && gameDate.getDate() >= 12;
     
     // Get scores (null for future games)
-    const teamScore = hasScores && usTeam ? parseInt(usTeam.result) || null : null;
-    const opponentScore = hasScores && opponent ? parseInt(opponent.result) || null : null;
+    let teamScore = hasScores && usTeam ? parseInt(usTeam.result) || null : null;
+    let opponentScore = hasScores && opponent ? parseInt(opponent.result) || null : null;
+    
+    // Detect forfeit games: 1-0 or 0-1 with one null score
+    // Forfeit win: teamScore=1, opponentScore=null -> set opponentScore=0
+    // Forfeit loss: teamScore=null, opponentScore=1 -> set teamScore=0
+    const isForfeitWin = teamScore === 1 && opponentScore === null;
+    const isForfeitLoss = teamScore === null && opponentScore === 1;
+    
+    if (isForfeitWin) {
+      opponentScore = 0;
+    } else if (isForfeitLoss) {
+      teamScore = 0;
+    }
     
     // Game is completed if it has scores (regardless of status field)
+    // Forfeit games are also considered completed
     const isCompleted = hasScores && teamScore !== null && opponentScore !== null;
     
     games.push({
@@ -395,6 +419,15 @@ async function upsertGames(client, games) {
 }
 
 /**
+ * Check if a team should be excluded from import
+ */
+function isExcludedTeam(teamName) {
+  if (!teamName) return false;
+  const lowerName = teamName.toLowerCase();
+  return EXCLUDED_TEAMS.some(excluded => lowerName.includes(excluded.toLowerCase()));
+}
+
+/**
  * Process a single team URL
  */
 async function processTeamUrl(client, url, league) {
@@ -405,6 +438,11 @@ async function processTeamUrl(client, url, league) {
     const teamData = extractTeamData(json, url, league);
     if (!teamData.team_id) {
       return { success: false, error: 'No team ID found' };
+    }
+    
+    // Check if team should be excluded
+    if (isExcludedTeam(teamData.name)) {
+      return { success: true, skipped: true, teamName: teamData.name, reason: 'Excluded team' };
     }
     
     await upsertTeam(client, teamData);
@@ -433,6 +471,7 @@ async function processTeamsInBatches(client, urls, league) {
   const results = {
     success: 0,
     failed: 0,
+    skipped: 0,
     totalGames: 0
   };
   
@@ -452,7 +491,10 @@ async function processTeamsInBatches(client, urls, league) {
     let batchGames = 0;
     
     for (const result of batchResults) {
-      if (result.success) {
+      if (result.skipped) {
+        results.skipped++;
+        console.log(`\n    ⏭ Skipped: ${result.teamName} (${result.reason})`);
+      } else if (result.success) {
         results.success++;
         batchSuccess++;
         results.totalGames += result.gamesProcessed;
@@ -520,9 +562,9 @@ async function main() {
     console.log('\n' + '='.repeat(60));
     console.log('IMPORT SUMMARY');
     console.log('='.repeat(60));
-    console.log(`Men's teams:     ${mensResults.success} imported, ${mensResults.failed} failed`);
+    console.log(`Men's teams:     ${mensResults.success} imported, ${mensResults.skipped} skipped, ${mensResults.failed} failed`);
     console.log(`Men's games:     ${mensResults.totalGames}`);
-    console.log(`Women's teams:   ${womensResults.success} imported, ${womensResults.failed} failed`);
+    console.log(`Women's teams:   ${womensResults.success} imported, ${womensResults.skipped} skipped, ${womensResults.failed} failed`);
     console.log(`Women's games:   ${womensResults.totalGames}`);
     console.log(`Total time:      ${elapsed} seconds`);
     

@@ -455,6 +455,7 @@ async function calculateDynamicStats(pool, filters) {
       AND tr.date_calculated = (SELECT MAX(date_calculated) FROM team_ratings WHERE season = t.season)
     WHERE t.league = $1
     AND t.season = '${season.replace(/'/g, "''")}'
+    AND t.is_excluded = FALSE
     ${conferenceClause}
     ORDER BY adjusted_net_rating DESC NULLS LAST
   `;
@@ -672,7 +673,7 @@ app.get('/api/conferences', async (req, res) => {
     const { league = 'mens', season = DEFAULT_SEASON } = req.query;
 
     const result = await pool.query(
-      'SELECT DISTINCT conference FROM teams WHERE league = $1 AND season = $2 AND conference IS NOT NULL ORDER BY conference',
+      'SELECT DISTINCT conference FROM teams WHERE league = $1 AND season = $2 AND conference IS NOT NULL AND is_excluded = FALSE ORDER BY conference',
       [league, season]
     );
 
@@ -1218,7 +1219,7 @@ app.get('/api/players', async (req, res) => {
     } = req.query;
 
     // Build WHERE clause
-    let whereConditions = ['p.league = $1', 'p.season = $2', 'p.gp >= $3'];
+    let whereConditions = ['p.league = $1', 'p.season = $2', 'p.gp >= $3', 't.is_excluded = FALSE'];
     let params = [league, season, parseInt(min_gp) || 0];
     let paramIndex = 4;
 
@@ -1523,6 +1524,36 @@ app.get('/api/bracketcast', async (req, res) => {
       };
     });
 
+    // Step 1c: Get NAIA record from games table (using is_naia_game flag for consistency)
+    // Exclude national tournament games since bracketcast is for projecting seeds
+    const naiaRecordResult = await pool.query(`
+      SELECT
+        g.team_id,
+        SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as naia_wins,
+        SUM(CASE WHEN g.team_score < g.opponent_score THEN 1 ELSE 0 END) as naia_losses
+      FROM games g
+      JOIN teams t ON g.team_id = t.team_id
+      WHERE t.league = $1
+        AND g.season = $2
+        AND g.is_completed = TRUE
+        AND g.is_exhibition = FALSE
+        AND g.is_naia_game = TRUE
+        AND g.is_national_tournament = FALSE
+      GROUP BY g.team_id
+    `, [league, season]);
+
+    const naiaRecords = {};
+    naiaRecordResult.rows.forEach(row => {
+      const wins = parseInt(row.naia_wins) || 0;
+      const losses = parseInt(row.naia_losses) || 0;
+      const total = wins + losses;
+      naiaRecords[row.team_id] = {
+        naia_wins: wins,
+        naia_losses: losses,
+        naia_win_pct: total > 0 ? wins / total : 0,
+      };
+    });
+
     // Create RPI rank lookup (1-indexed)
     const rpiRanks = {};
     teams.forEach((team, idx) => {
@@ -1600,6 +1631,7 @@ app.get('/api/bracketcast', async (req, res) => {
       const qr = quadrantRecords[team.team_id] || {};
       const cr = conferenceRecords[team.team_id] || {};
       const tr = totalRecords[team.team_id] || { total_wins: 0, total_losses: 0 };
+      const nr = naiaRecords[team.team_id] || { naia_wins: 0, naia_losses: 0, naia_win_pct: 0 };
       const rpiRank = rpiRanks[team.team_id];
 
       // Calculate total win percentage
@@ -1620,10 +1652,10 @@ app.get('/api/bracketcast', async (req, res) => {
         total_wins: tr.total_wins,
         total_losses: tr.total_losses,
         total_win_pct: totalWinPct,
-        // NAIA record (used in RPI formula)
-        naia_wins: team.naia_wins || 0,
-        naia_losses: team.naia_losses || 0,
-        naia_win_pct: team.naia_win_pct ? parseFloat(team.naia_win_pct) : 0,
+        // NAIA record (calculated from games table using is_naia_game flag)
+        naia_wins: nr.naia_wins,
+        naia_losses: nr.naia_losses,
+        naia_win_pct: nr.naia_win_pct,
         // Legacy fields for backwards compatibility
         wins: tr.total_wins,
         losses: tr.total_losses,

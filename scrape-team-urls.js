@@ -30,6 +30,23 @@ const CONCURRENT_REQUESTS = 10;  // Number of parallel requests
 const DELAY_BETWEEN_BATCHES = 500;  // ms delay between batches
 
 /**
+ * EXTRA TEAMS - Teams that don't appear on the main teams listing page
+ * These are typically conference-only teams that need to be added manually.
+ * Format: { slug: 'teamslug', league: 'mens' | 'womens' }
+ * 
+ * To find a team's slug, go to their page on naiastats.prestosports.com
+ * and look at the URL, e.g., /sports/mbkb/2025-26/teams/governorsstate
+ */
+const EXTRA_TEAMS = [
+  // Governors State (Chicagoland Conference) - only shows on conference page, not main listing
+  { slug: 'governorsstate', league: 'mens' },
+  // Paul Quinn (Red River Conference) - only shows on conference page, not main listing
+  { slug: 'paulquinn', league: 'mens' },
+  // UHSP (American Midwest Conference) - only shows on conference page, not main listing
+  { slug: 'uhsp', league: 'mens' },
+];
+
+/**
  * Make an HTTPS GET request and return the response body
  */
 function fetchPage(url) {
@@ -158,13 +175,30 @@ async function main() {
     console.log('\n📊 MEN\'S BASKETBALL');
     console.log('-'.repeat(40));
     const mensData = await getTeamSlugs(LEAGUES.mens);
-    results.mens = await processTeamsInBatches(mensData.slugs, mensData.sportPath);
+    
+    // Add extra men's teams that don't appear on the main listing
+    const extraMensSlugs = EXTRA_TEAMS.filter(t => t.league === 'mens').map(t => t.slug);
+    const allMensSlugs = [...new Set([...mensData.slugs, ...extraMensSlugs])];
+    if (extraMensSlugs.length > 0) {
+      console.log(`  + Adding ${extraMensSlugs.length} extra teams: ${extraMensSlugs.join(', ')}`);
+    }
+    
+    results.mens = await processTeamsInBatches(allMensSlugs, mensData.sportPath);
     console.log(`✅ Men's: ${results.mens.length} JSON URLs collected`);
     
     // Process Women's Basketball
     console.log('\n📊 WOMEN\'S BASKETBALL');
     console.log('-'.repeat(40));
     const womensData = await getTeamSlugs(LEAGUES.womens);
+    
+    // Add extra women's teams that don't appear on the main listing
+    const extraWomensSlugs = EXTRA_TEAMS.filter(t => t.league === 'womens').map(t => t.slug);
+    const allWomensSlugs = [...new Set([...womensData.slugs, ...extraWomensSlugs])];
+    if (extraWomensSlugs.length > 0) {
+      console.log(`  + Adding ${extraWomensSlugs.length} extra teams: ${extraWomensSlugs.join(', ')}`);
+    }
+    
+    results.womens = await processTeamsInBatches(allWomensSlugs, womensData.sportPath);
     results.womens = await processTeamsInBatches(womensData.slugs, womensData.sportPath);
     console.log(`✅ Women's: ${results.womens.length} JSON URLs collected`);
     
