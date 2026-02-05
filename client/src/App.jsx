@@ -23,7 +23,7 @@ const DEFAULTS = {
   conference: 'All Conferences',
   opponent: 'all',
   seasonSegment: 'all',
-  statGroup: 'Overview',
+  statGroup: 'Efficiency',
   view: 'table',
 };
 

@@ -1,12 +1,9 @@
 import './StatGroupTabs.css';
 
 const STAT_GROUPS = [
-  { key: 'Overview', label: 'Ratings' },
-  { key: 'Shooting', label: 'Shooting' },
-  { key: 'Rebounding', label: 'Rebounding' },
-  { key: 'Playmaking', label: 'Playmaking' },
+  { key: 'Efficiency', label: 'Efficiency' },
+  { key: 'Offense', label: 'Offense' },
   { key: 'Defense', label: 'Defense' },
-  { key: 'Schedule', label: 'Schedule' },
   { key: 'Experimental', label: 'Experimental' },
 ];
 
