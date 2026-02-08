@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import './Scout.css';
 import TeamLogo from './TeamLogo';
 import TeamRadarChart from './TeamRadarChart';
 import SeasonTrajectoryChart from './SeasonTrajectoryChart';
+import BoxScoreModal from './BoxScoreModal';
+import Matchup from './Matchup';
 
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
@@ -157,8 +159,11 @@ const STAT_GROUPS = {
 
 function Scout({ league, season, teams = [], conferences = [] }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const teamIdFromUrl = searchParams.get('team');
-  
+  const tabFromUrl = searchParams.get('tab') || 'report';
+
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [selectedTeamId, setSelectedTeamId] = useState(teamIdFromUrl);
   const [selectedConference, setSelectedConference] = useState('All Conferences');
   const [teamData, setTeamData] = useState(null);
@@ -168,6 +173,19 @@ function Scout({ league, season, teams = [], conferences = [] }) {
   const [percentiles, setPercentiles] = useState(null);
   const [loading, setLoading] = useState(false);
   const [statGroup, setStatGroup] = useState('Overview');
+  const [boxScoreGameId, setBoxScoreGameId] = useState(null);
+
+  // Update URL when tab changes
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams);
+    if (tab === 'report') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   // Update URL when team selection changes
   const handleTeamChange = (teamId) => {
@@ -431,6 +449,31 @@ function Scout({ league, season, teams = [], conferences = [] }) {
         <p className="page-subtitle">In-depth analysis and scouting report for individual teams</p>
       </div>
 
+      {/* Tab Toggle */}
+      <div className="scout-tabs">
+        <button
+          className={`scout-tab ${activeTab === 'report' ? 'active' : ''}`}
+          onClick={() => handleTabChange('report')}
+        >
+          Team Report
+        </button>
+        <button
+          className={`scout-tab ${activeTab === 'matchup' ? 'active' : ''}`}
+          onClick={() => handleTabChange('matchup')}
+        >
+          Matchup Preview
+        </button>
+      </div>
+
+      {activeTab === 'matchup' ? (
+        <Matchup
+          league={league}
+          season={season}
+          teams={teams}
+          conferences={conferences}
+        />
+      ) : (
+      <>
       {/* Team Selector */}
       <div className="scout-filters">
         <div className="filter-group">
@@ -684,6 +727,7 @@ function Scout({ league, season, teams = [], conferences = [] }) {
                       <th className="col-quad">Quad</th>
                       <th className="col-result">Result</th>
                       <th className="col-score">Score</th>
+                      <th className="col-actions"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -732,6 +776,37 @@ function Scout({ league, season, teams = [], conferences = [] }) {
                               {game.prediction.team_score}-{game.prediction.opponent_score}
                             </span>
                           ) : '-'}
+                        </td>
+                        <td className="col-actions">
+                          {game.is_completed && (
+                            <button
+                              className="schedule-action-btn"
+                              title="View box score"
+                              onClick={() => setBoxScoreGameId(game.game_id)}
+                            >
+                              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <rect x="2" y="2" width="12" height="12" rx="1.5" strokeLinecap="round"/>
+                                <line x1="2" y1="6" x2="14" y2="6" strokeLinecap="round"/>
+                                <line x1="2" y1="10" x2="14" y2="10" strokeLinecap="round"/>
+                                <line x1="6" y1="2" x2="6" y2="14" strokeLinecap="round"/>
+                                <line x1="10" y1="2" x2="10" y2="14" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          )}
+                          {game.opponent_id && (
+                            <button
+                              className="schedule-action-btn"
+                              title="View matchup"
+                              onClick={() => navigate(`/scout/matchup?team1=${selectedTeamId}&team2=${game.opponent_id}&league=${league}&season=${season}`)}
+                            >
+                              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <path d="M4 2L1 5L4 8" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M12 8L15 11L12 14" strokeLinecap="round" strokeLinejoin="round"/>
+                                <line x1="1" y1="5" x2="12" y2="5" strokeLinecap="round"/>
+                                <line x1="4" y1="11" x2="15" y2="11" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -795,6 +870,16 @@ function Scout({ league, season, teams = [], conferences = [] }) {
         </div>
       ) : (
         <div className="scout-error">Team not found</div>
+      )}
+
+      {boxScoreGameId && (
+        <BoxScoreModal
+          gameId={boxScoreGameId}
+          season={season}
+          onClose={() => setBoxScoreGameId(null)}
+        />
+      )}
+      </>
       )}
     </main>
   );

@@ -34,7 +34,17 @@
       "Bash(npx vite:*)",
       "Bash(xargs kill:*)",
       "Bash(source:*)",
-      "Bash(DATABASE_URL=\"postgresql://axis_naia_basketball_db_user:3aA0GkusGshKy6jn2FX4Y6W5iqu7jivX@dpg-d5renb8gjchc739o7rf0-a.oregon-postgres.render.com/axis_naia_basketball_db\" node:*)"
+      "Bash(DATABASE_URL=\"postgresql://axis_naia_basketball_db_user:3aA0GkusGshKy6jn2FX4Y6W5iqu7jivX@dpg-d5renb8gjchc739o7rf0-a.oregon-postgres.render.com/axis_naia_basketball_db\" node:*)",
+      "Bash(/usr/local/bin/node:*)",
+      "Bash(/opt/homebrew/bin/node:*)",
+      "Bash(~/.nvm/versions/node/*/bin/node)",
+      "Bash(export NVM_DIR=\"$HOME/.nvm\")",
+      "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
+      "Bash(. \"$NVM_DIR/nvm.sh\")",
+      "Bash(brew:*)",
+      "Bash(fnm list:*)",
+      "Bash(volta list:*)",
+      "Bash(echo:*)"
     ]
   }
 }
