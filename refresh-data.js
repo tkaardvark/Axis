@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * Daily Data Refresh Script
+ * Full Data Refresh Script
  * 
- * This script is designed to run as a cron job to refresh all NAIA basketball data.
- * It runs the import script followed by the analytics calculation.
+ * Runs the complete pipeline: scrape → import → conferences → analytics → players.
+ * Use this for manual one-off refreshes. Automated scheduling is handled by
+ * scheduler.js inside the server process.
  * 
  * Usage: node refresh-data.js [--season 2024-25]
- * 
- * Scheduled via Render Cron Job to run daily at 2am PST (10:00 UTC)
  */
 
 const { spawn } = require('child_process');
@@ -52,21 +51,30 @@ function runScript(scriptName, args = []) {
 async function main() {
   const startTime = Date.now();
   console.log('\n' + '='.repeat(60));
-  console.log('NAIA Data Refresh - Starting');
+  console.log('NAIA Full Data Refresh - Starting');
   console.log(`Season: ${SEASON}`);
   console.log(`Time: ${new Date().toISOString()}`);
   console.log('='.repeat(60));
 
   try {
-    // Step 1: Import fresh game data
+    // Step 1: Scrape team URLs
+    await runScript('scrape-team-urls.js', ['--season', SEASON]);
+
+    // Step 2: Import fresh game data
     await runScript('import-data.js', ['--season', SEASON]);
 
-    // Step 2: Calculate analytics
+    // Step 3: Scrape conference assignments
+    await runScript('scrape-conferences.js', ['--season', SEASON]);
+
+    // Step 4: Calculate analytics
     await runScript('calculate-analytics.js', ['--season', SEASON]);
+
+    // Step 5: Import player stats
+    await runScript('import-players.js', ['--season', SEASON, '--league', 'mens']);
 
     const elapsed = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
     console.log('\n' + '='.repeat(60));
-    console.log('NAIA Data Refresh - COMPLETE');
+    console.log('NAIA Full Data Refresh - COMPLETE');
     console.log(`Total time: ${elapsed} minutes`);
     console.log(`Finished: ${new Date().toISOString()}`);
     console.log('='.repeat(60) + '\n');
@@ -74,7 +82,7 @@ async function main() {
     process.exit(0);
   } catch (error) {
     console.error('\n' + '='.repeat(60));
-    console.error('NAIA Data Refresh - FAILED');
+    console.error('NAIA Full Data Refresh - FAILED');
     console.error(`Error: ${error.message}`);
     console.error(`Time: ${new Date().toISOString()}`);
     console.error('='.repeat(60) + '\n');

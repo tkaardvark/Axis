@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
+const { startScheduler } = require('./scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -2391,4 +2392,11 @@ if (process.env.NODE_ENV === 'production') {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
+  // Start automated task scheduler in production
+  if (process.env.NODE_ENV === 'production') {
+    startScheduler();
+  } else {
+    console.log('Scheduler disabled in development (set NODE_ENV=production to enable)');
+  }
 });
