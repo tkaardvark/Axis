@@ -2095,30 +2095,119 @@ app.get('/api/conference-rankings', async (req, res) => {
       ORDER BY AVG(lr.adjusted_net_rating) DESC
     `, [league, season]);
 
+    // ── Projected top-half metric ──
+    // For each conference: project every team's conference W/L, filter to
+    // teams projected .500+, and average their adjusted net rating.
+
+    // 1. Get all teams with their conference and adjusted ratings
+    const teamsWithRatings = await pool.query(`
+      SELECT t.team_id, t.conference,
+             lr.adjusted_net_rating,
+             lr.adjusted_offensive_rating,
+             lr.adjusted_defensive_rating,
+             lr.pace
+      FROM teams t
+      JOIN (
+        SELECT tr.*
+        FROM team_ratings tr
+        INNER JOIN (
+          SELECT team_id, MAX(date_calculated) as max_date
+          FROM team_ratings WHERE season = $2 GROUP BY team_id
+        ) latest ON tr.team_id = latest.team_id AND tr.date_calculated = latest.max_date
+        WHERE tr.season = $2
+      ) lr ON t.team_id = lr.team_id
+      WHERE t.league = $1 AND t.season = $2 AND t.is_excluded = FALSE AND t.conference IS NOT NULL
+    `, [league, season]);
+
+    // Build a ratings lookup
+    const ratingsMap = {};
+    teamsWithRatings.rows.forEach(r => {
+      ratingsMap[r.team_id] = {
+        conference: r.conference,
+        adjNet: parseFloat(r.adjusted_net_rating) || 0,
+        adjO: parseFloat(r.adjusted_offensive_rating) || 100,
+        adjD: parseFloat(r.adjusted_defensive_rating) || 100,
+        pace: parseFloat(r.pace) || 70,
+      };
+    });
+
+    // 2. Get all conference games (completed and future)
+    const confGames = await pool.query(`
+      SELECT g.team_id, g.opponent_id, g.team_score, g.opponent_score,
+             g.is_completed, g.location
+      FROM games g
+      JOIN teams t ON g.team_id = t.team_id AND t.season = $2
+      WHERE g.season = $2 AND g.is_conference = TRUE AND g.is_naia_game = TRUE
+        AND g.is_exhibition = FALSE AND t.league = $1 AND t.is_excluded = FALSE
+    `, [league, season]);
+
+    // 3. Project each team's conference record
+    // teamConfRecords: { teamId: { wins, losses } }
+    const teamConfRecords = {};
+    confGames.rows.forEach(g => {
+      if (!teamConfRecords[g.team_id]) teamConfRecords[g.team_id] = { wins: 0, losses: 0 };
+
+      if (g.is_completed && g.team_score != null && g.opponent_score != null) {
+        // Actual result
+        if (g.team_score > g.opponent_score) teamConfRecords[g.team_id].wins++;
+        else teamConfRecords[g.team_id].losses++;
+      } else if (!g.is_completed && g.opponent_id && ratingsMap[g.team_id] && ratingsMap[g.opponent_id]) {
+        // Predict future game
+        const team = ratingsMap[g.team_id];
+        const opp = ratingsMap[g.opponent_id];
+        const homeAdv = g.location === 'home' ? 3.5 : (g.location === 'away' ? -3.5 : 0);
+        const expectedMarginPer100 = (team.adjO - team.adjD) - (opp.adjO - opp.adjD);
+        const paceFactor = ((team.pace + opp.pace) / 2) / 100;
+        const predictedMargin = expectedMarginPer100 * paceFactor + homeAdv;
+        if (predictedMargin > 0) teamConfRecords[g.team_id].wins++;
+        else teamConfRecords[g.team_id].losses++;
+      }
+    });
+
+    // 4. For each conference, filter teams to .500+ and average their adj net
+    const confTopHalf = {};
+    Object.entries(ratingsMap).forEach(([teamId, info]) => {
+      const rec = teamConfRecords[teamId];
+      if (!rec) return;
+      const totalGames = rec.wins + rec.losses;
+      if (totalGames === 0) return;
+      const winPct = rec.wins / totalGames;
+      if (winPct < 0.5) return;
+
+      if (!confTopHalf[info.conference]) confTopHalf[info.conference] = { sum: 0, count: 0 };
+      confTopHalf[info.conference].sum += info.adjNet;
+      confTopHalf[info.conference].count++;
+    });
+
     // Add rank numbers
-    const rankings = result.rows.map((row, idx) => ({
-      conference: row.conference,
-      team_count: parseInt(row.team_count),
-      avg_rpi: parseFloat(row.avg_rpi),
-      avg_adj_net: parseFloat(row.avg_adj_net),
-      avg_adj_ortg: parseFloat(row.avg_adj_ortg),
-      avg_adj_drtg: parseFloat(row.avg_adj_drtg),
-      avg_sos: parseFloat(row.avg_sos),
-      avg_efg_pct: parseFloat(row.avg_efg_pct),
-      avg_to_rate: parseFloat(row.avg_to_rate),
-      avg_oreb_pct: parseFloat(row.avg_oreb_pct),
-      avg_ft_rate: parseFloat(row.avg_ft_rate),
-      avg_pace: parseFloat(row.avg_pace),
-      avg_three_pt_rate: parseFloat(row.avg_three_pt_rate),
-      best_rpi_rank: parseInt(row.best_rpi_rank),
-      worst_rpi_rank: parseInt(row.worst_rpi_rank),
-      non_conf_wins: parseInt(row.nc_wins) || 0,
-      non_conf_losses: parseInt(row.nc_losses) || 0,
-      non_conf_win_pct: (parseInt(row.nc_wins) + parseInt(row.nc_losses)) > 0
-        ? parseFloat((parseInt(row.nc_wins) / (parseInt(row.nc_wins) + parseInt(row.nc_losses))).toFixed(3))
-        : 0,
-      adj_net_rank: idx + 1,
-    }));
+    const rankings = result.rows.map((row, idx) => {
+      const th = confTopHalf[row.conference];
+      return {
+        conference: row.conference,
+        team_count: parseInt(row.team_count),
+        avg_rpi: parseFloat(row.avg_rpi),
+        avg_adj_net: parseFloat(row.avg_adj_net),
+        avg_adj_ortg: parseFloat(row.avg_adj_ortg),
+        avg_adj_drtg: parseFloat(row.avg_adj_drtg),
+        avg_sos: parseFloat(row.avg_sos),
+        avg_efg_pct: parseFloat(row.avg_efg_pct),
+        avg_to_rate: parseFloat(row.avg_to_rate),
+        avg_oreb_pct: parseFloat(row.avg_oreb_pct),
+        avg_ft_rate: parseFloat(row.avg_ft_rate),
+        avg_pace: parseFloat(row.avg_pace),
+        avg_three_pt_rate: parseFloat(row.avg_three_pt_rate),
+        best_rpi_rank: parseInt(row.best_rpi_rank),
+        worst_rpi_rank: parseInt(row.worst_rpi_rank),
+        non_conf_wins: parseInt(row.nc_wins) || 0,
+        non_conf_losses: parseInt(row.nc_losses) || 0,
+        non_conf_win_pct: (parseInt(row.nc_wins) + parseInt(row.nc_losses)) > 0
+          ? parseFloat((parseInt(row.nc_wins) / (parseInt(row.nc_wins) + parseInt(row.nc_losses))).toFixed(3))
+          : 0,
+        adj_net_rank: idx + 1,
+        top_half_adj_net: th && th.count > 0 ? parseFloat((th.sum / th.count).toFixed(2)) : null,
+        top_half_count: th ? th.count : 0,
+      };
+    });
 
     res.json(rankings);
   } catch (err) {

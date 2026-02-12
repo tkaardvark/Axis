@@ -106,6 +106,7 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
     { key: 'avg_adj_drtg', label: 'Avg Adj DRTG', format: v => v?.toFixed(1), lowerBetter: true },
     { key: 'avg_sos', label: 'Avg SOS', format: v => v?.toFixed(4) },
     { key: 'non_conf_win_pct', label: 'Non-Conf Win%', format: v => (v * 100).toFixed(1) + '%' },
+    { key: 'top_half_adj_net', label: 'Top-Half NET', format: v => v?.toFixed(2) },
   ];
 
   // Sync URL param
@@ -351,6 +352,7 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
           case 'avg_sos': return row.avg_sos || 0;
           case 'best_rpi_rank': return row.best_rpi_rank || 999;
           case 'non_conf_win_pct': return row.non_conf_win_pct || 0;
+          case 'top_half_adj_net': return row.top_half_adj_net ?? -999;
           default: return row.adj_net_rank || 999;
         }
       };
@@ -516,6 +518,7 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
       { key: 'avg_sos', higherIsBetter: true },
       { key: 'best_rpi_rank', higherIsBetter: false },  // lower rank = better
       { key: 'non_conf_win_pct', higherIsBetter: true },
+      { key: 'top_half_adj_net', higherIsBetter: true },
     ];
 
     const result = {};
@@ -898,6 +901,9 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
                       <th className="col-sortable" onClick={() => handleRankSort('non_conf_win_pct')}>
                         Non-Conf Win%{rankSortIndicator('non_conf_win_pct')}
                       </th>
+                      <th className="col-sortable" onClick={() => handleRankSort('top_half_adj_net')}>
+                        Top-Half NET{rankSortIndicator('top_half_adj_net')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -923,6 +929,10 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
                           {conf.non_conf_win_pct != null
                             ? (conf.non_conf_win_pct * 100).toFixed(1) + '%'
                             : '-'}
+                        </td>
+                        <td className={`mono-cell ${getRankingColorClass(conf.conference, 'top_half_adj_net')}`}
+                            title={conf.top_half_count != null ? `${conf.top_half_count} teams proj. ≥.500 in conf. play` : ''}>
+                          {conf.top_half_adj_net != null ? conf.top_half_adj_net.toFixed(2) : '-'}
                         </td>
                       </tr>
                     ))}
