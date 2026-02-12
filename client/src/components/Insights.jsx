@@ -84,18 +84,16 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
     <>
 
       {/* Tab Navigation */}
-      <div className="insights-controls">
-        <div className="insights-tab-nav">
+      <div className="page-tabs">
           {TABS.map(tab => (
             <button
               key={tab.id}
-              className={`insights-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+              className={`page-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
             </button>
           ))}
-        </div>
       </div>
 
       {/* Overview Tab */}

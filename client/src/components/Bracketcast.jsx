@@ -217,27 +217,28 @@ function Bracketcast({ league, season, onTeamClick }) {
         <p className="page-subtitle">Selection committee criteria rankings and projected 64-team national tournament bracket</p>
       </div>
 
-      <div className="bracketcast-controls">
-        <div className="view-toggle">
+      <div className="page-tabs">
           <button
-            className={`view-btn ${view === 'table' ? 'active' : ''}`}
+            className={`page-tab ${view === 'table' ? 'active' : ''}`}
             onClick={() => setView('table')}
           >
             Selection Table
           </button>
           <button
-            className={`view-btn ${view === 'pods' ? 'active' : ''}`}
+            className={`page-tab ${view === 'pods' ? 'active' : ''}`}
             onClick={() => setView('pods')}
           >
             Opening Round Pods
           </button>
           <button
-            className={`view-btn ${view === 'bracket' ? 'active' : ''}`}
+            className={`page-tab ${view === 'bracket' ? 'active' : ''}`}
             onClick={() => setView('bracket')}
           >
             Seed Groups
           </button>
         </div>
+
+      <div className="bracketcast-controls">
 
         <div className="date-filter">
           <label htmlFor="asOfDate">As of Date:</label>

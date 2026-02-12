@@ -530,15 +530,15 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
       </div>
 
       {/* Tab Navigation */}
-      <div className="conf-tabs">
+      <div className="page-tabs">
         <button
-          className={`conf-tab ${activeTab === 'rankings' ? 'conf-tab-active' : ''}`}
+          className={`page-tab ${activeTab === 'rankings' ? 'active' : ''}`}
           onClick={() => setActiveTab('rankings')}
         >
           Power Rankings
         </button>
         <button
-          className={`conf-tab ${activeTab === 'detail' ? 'conf-tab-active' : ''}`}
+          className={`page-tab ${activeTab === 'detail' ? 'active' : ''}`}
           onClick={() => setActiveTab('detail')}
         >
           Conference Detail

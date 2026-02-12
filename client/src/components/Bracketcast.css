@@ -22,17 +22,11 @@
 /* Controls Row */
 .bracketcast-controls {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 16px 24px;
   flex-wrap: wrap;
   gap: 16px;
-}
-
-/* View Toggle */
-.view-toggle {
-  display: flex;
-  gap: 8px;
 }
 
 /* Date Filter */
@@ -82,29 +76,6 @@
 .clear-date-btn:hover {
   background-color: var(--color-danger-bg);
   color: var(--color-danger-text);
-}
-
-.view-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--color-border-secondary);
-  border-radius: 6px;
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.view-btn:hover {
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
-}
-
-.view-btn.active {
-  background-color: var(--color-btn-active-bg);
-  border-color: var(--color-btn-active-bg);
-  color: var(--color-btn-active-text);
 }
 
 /* Table View */

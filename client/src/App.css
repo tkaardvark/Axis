@@ -19,6 +19,48 @@
   margin: 0 0 0 0;
 }
 
+/* ===== Shared Page Tabs (underline style) ===== */
+.page-tabs {
+  display: flex;
+  gap: 0;
+  padding: 16px 24px 0;
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.page-tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.page-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.page-tab.active {
+  color: var(--color-text-primary);
+}
+
+.page-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-text-primary);
+  border-radius: 1px 1px 0 0;
+}
+
 .last-updated {
   font-size: 13px;
   color: var(--color-text-tertiary);
@@ -37,6 +79,23 @@
 
   .page-header h1 {
     font-size: 22px;
+  }
+
+  .page-tabs {
+    padding: 12px 16px 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .page-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .page-tab {
+    padding: 8px 14px;
+    font-size: 12px;
+    flex-shrink: 0;
   }
 }
 

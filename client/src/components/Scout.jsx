@@ -450,15 +450,15 @@ function Scout({ league, season, teams = [], conferences = [] }) {
       </div>
 
       {/* Tab Toggle */}
-      <div className="scout-tabs">
+      <div className="page-tabs">
         <button
-          className={`scout-tab ${activeTab === 'report' ? 'active' : ''}`}
+          className={`page-tab ${activeTab === 'report' ? 'active' : ''}`}
           onClick={() => handleTabChange('report')}
         >
           Team Report
         </button>
         <button
-          className={`scout-tab ${activeTab === 'matchup' ? 'active' : ''}`}
+          className={`page-tab ${activeTab === 'matchup' ? 'active' : ''}`}
           onClick={() => handleTabChange('matchup')}
         >
           Matchup Preview

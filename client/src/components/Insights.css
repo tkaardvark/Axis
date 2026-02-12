@@ -12,59 +12,6 @@
   margin: 4px 0 0;
 }
 
-/* Controls wrapper */
-.insights-controls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 16px;
-  padding: 0 24px 16px;
-}
-
-/* Tab Navigation */
-.insights-tab-nav {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  flex-wrap: nowrap;
-  -webkit-overflow-scrolling: touch;
-}
-
-.insights-tab-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.insights-tab-btn {
-  padding: 7px 16px;
-  border: 1px solid var(--color-border-primary);
-  border-radius: 20px;
-  background-color: transparent;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-  flex-shrink: 0;
-  flex-grow: 0;
-  width: auto;
-}
-
-.insights-tab-btn:hover {
-  background-color: var(--color-bg-hover);
-  color: var(--color-text-primary);
-  border-color: var(--color-text-tertiary);
-}
-
-.insights-tab-btn.active {
-  background-color: var(--color-accent-primary);
-  border-color: var(--color-accent-primary);
-  color: var(--color-text-inverted);
-}
-
 /* Filter dropdown */
 .insights-filter {
   flex-shrink: 0;

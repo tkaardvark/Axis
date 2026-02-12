@@ -12,39 +12,6 @@
   margin-top: 4px;
 }
 
-/* ===== Tab Navigation ===== */
-.conf-tabs {
-  display: flex;
-  gap: 0;
-  padding: 16px 24px 0;
-  border-bottom: 1px solid var(--color-border-primary);
-}
-
-.conf-tab {
-  padding: 10px 20px;
-  font-family: var(--font-heading);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-tertiary);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  letter-spacing: 0.3px;
-}
-
-.conf-tab:hover {
-  color: var(--color-text-secondary);
-}
-
-.conf-tab-active {
-  color: var(--color-text-primary);
-  border-bottom-color: var(--color-text-primary);
-}
-
 /* Conference Selector */
 .conf-selector {
   display: flex;
