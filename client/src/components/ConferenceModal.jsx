@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ConferenceModal.css';
 import TeamLogo from './TeamLogo';
 import { API_URL } from '../utils/api';
@@ -25,6 +26,8 @@ const formatDateForDisplay = (date) => {
 
 function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick }) {
   const focusTrapRef = useFocusTrap();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -124,6 +127,14 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick 
     }
   };
 
+  const handleViewConferencePage = () => {
+    const params = new URLSearchParams(searchParams);
+    params.set('conference', conferenceName);
+    params.delete('conferenceModal');
+    onClose();
+    navigate(`/conferences?${params.toString()}`);
+  };
+
   const handlePrevDay = () => {
     setSelectedDate(prev => {
       const newDate = new Date(prev);
@@ -155,6 +166,13 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick 
           <span className="conference-modal-subtitle">
             {teams.length} Teams • {season} Season
           </span>
+        </div>
+
+        {/* Conference Page Link */}
+        <div className="modal-conference-link">
+          <button className="conference-link-btn" onClick={handleViewConferencePage}>
+            View Full Conference Page →
+          </button>
         </div>
 
         {/* Teams Table */}

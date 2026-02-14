@@ -723,7 +723,7 @@ function Scout({ league, season, teams = [], conferences = [] }) {
                             <button
                               className="schedule-action-btn"
                               title="View matchup"
-                              onClick={() => navigate(`/scout/matchup?team1=${selectedTeamId}&team2=${game.opponent_id}&league=${league}&season=${season}`)}
+                              onClick={() => navigate(`/scout?tab=matchup&team1=${selectedTeamId}&team2=${game.opponent_id}&league=${league}&season=${season}`)}
                             >
                               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5">
                                 <path d="M4 2L1 5L4 8" strokeLinecap="round" strokeLinejoin="round"/>
