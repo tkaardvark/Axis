@@ -49,6 +49,14 @@ function Matchup({ league, season, teams = [], conferences = [], sourceParam = '
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Sync team selections from URL params (e.g. navigated from schedule matchup link)
+  useEffect(() => {
+    const urlTeam1 = searchParams.get('team1') || '';
+    const urlTeam2 = searchParams.get('team2') || '';
+    if (urlTeam1 !== team1Id) setTeam1Id(urlTeam1);
+    if (urlTeam2 !== team2Id) setTeam2Id(urlTeam2);
+  }, [searchParams.get('team1'), searchParams.get('team2')]);
+
   // Sync URL params when teams change
   useEffect(() => {
     const params = new URLSearchParams(searchParams);

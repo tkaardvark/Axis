@@ -91,6 +91,17 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
 
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [selectedTeamId, setSelectedTeamId] = useState(teamIdFromUrl);
+
+  // Sync activeTab and selectedTeamId when URL params change (e.g. from schedule matchup link)
+  useEffect(() => {
+    const urlTab = searchParams.get('tab') || 'report';
+    if (urlTab !== activeTab) setActiveTab(urlTab);
+  }, [searchParams.get('tab')]);
+
+  useEffect(() => {
+    const urlTeam = searchParams.get('team');
+    if (urlTeam !== selectedTeamId) setSelectedTeamId(urlTeam);
+  }, [searchParams.get('team')]);
   const [selectedConference, setSelectedConference] = useState('All Conferences');
   const [teamData, setTeamData] = useState(null);
   const [splits, setSplits] = useState([]);

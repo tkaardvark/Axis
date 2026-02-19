@@ -107,6 +107,23 @@ export const TOOLTIPS = {
   runs_scored_per_game: '10-0 Runs Per Game - Average number of 10+ point unanswered scoring runs per game.',
   runs_allowed_per_game: '10-0 Runs Allowed Per Game - Average 10+ point unanswered runs allowed per game. Lower is better.',
 
+  // ── Clutch (Player) ──
+  clutch_games: 'Clutch Games - Games with clutch time (last 5 min, score within 5 pts, or any overtime within 5 pts).',
+  clutch_pts: 'Clutch Points - Total points scored during clutch time.',
+  clutch_ppg: 'Clutch PPG - Points per game scored during clutch time.',
+  clutch_fgm: 'Clutch FGM - Field goals made during clutch time.',
+  clutch_fga: 'Clutch FGA - Field goal attempts during clutch time.',
+  clutch_fg_pct: 'Clutch FG% - Field goal percentage during clutch time.',
+  clutch_3pm: 'Clutch 3PM - Three-pointers made during clutch time.',
+  clutch_3pa: 'Clutch 3PA - Three-point attempts during clutch time.',
+  clutch_3p_pct: 'Clutch 3P% - Three-point percentage during clutch time.',
+  clutch_ftm: 'Clutch FTM - Free throws made during clutch time.',
+  clutch_fta: 'Clutch FTA - Free throw attempts during clutch time.',
+  clutch_ft_pct: 'Clutch FT% - Free throw percentage during clutch time.',
+  clutch_ast: 'Clutch AST - Assists during clutch time.',
+  clutch_reb: 'Clutch REB - Rebounds during clutch time.',
+  clutch_to: 'Clutch TO - Turnovers during clutch time.',
+
   // ── Bracketcast-specific ──
   rank: 'Rank - Dynamic ranking based on current sort column',
   area: 'Geographic Area - East, Midwest, North, South, or West',

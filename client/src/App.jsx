@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -73,6 +73,10 @@ function App() {
   // Deep link support: read modal params from URL
   const teamModalId = searchParams.get('teamModal');
   const conferenceModalName = searchParams.get('conferenceModal');
+
+  // Track intentional closes to prevent deep-link effect from re-opening
+  const closingTeamModal = useRef(false);
+  const closingConfModal = useRef(false);
 
   // Helper to update URL params
   const updateParams = useCallback((updates) => {
@@ -215,6 +219,7 @@ function App() {
   }, [setSearchParams]);
 
   const handleCloseModal = useCallback(() => {
+    closingTeamModal.current = true;
     setSelectedTeam(null);
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -233,6 +238,7 @@ function App() {
   }, [setSearchParams]);
 
   const handleCloseConferenceModal = useCallback(() => {
+    closingConfModal.current = true;
     setSelectedConference(null);
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -243,6 +249,10 @@ function App() {
 
   // Deep link: open team modal from URL param on load
   useEffect(() => {
+    if (closingTeamModal.current) {
+      if (!teamModalId) closingTeamModal.current = false;
+      return;
+    }
     if (teamModalId && !selectedTeam && teams.length > 0) {
       const team = teams.find(t => String(t.team_id) === String(teamModalId));
       if (team) {
@@ -253,6 +263,10 @@ function App() {
 
   // Deep link: open conference modal from URL param on load
   useEffect(() => {
+    if (closingConfModal.current) {
+      if (!conferenceModalName) closingConfModal.current = false;
+      return;
+    }
     if (conferenceModalName && !selectedConference) {
       setSelectedConference(conferenceModalName);
     }

@@ -56,8 +56,7 @@ router.get('/api/bracketcast', async (req, res) => {
       asOfDate = asOfResult.rows[0].as_of_date;
     }
 
-    // Step 1: Get all teams with their RPI and create RPI rankings
-    // Note: RPI from team_ratings is pre-calculated, but records will be filtered by date
+    // Step 1: Get all teams (RPI/SOS will be calculated on-the-fly from date-filtered games)
     const teamsResult = await pool.query(`
       SELECT
         t.team_id,
@@ -68,13 +67,6 @@ router.get('/api/bracketcast', async (req, res) => {
         t.state,
         t.latitude,
         t.longitude,
-        tr.rpi,
-        tr.strength_of_schedule,
-        tr.naia_wins,
-        tr.naia_losses,
-        tr.naia_win_pct,
-        tr.opponent_win_pct,
-        tr.opponent_opponent_win_pct,
         tr.adjusted_net_rating as net_efficiency
       FROM teams t
       LEFT JOIN team_ratings tr ON t.team_id = tr.team_id
@@ -83,7 +75,6 @@ router.get('/api/bracketcast', async (req, res) => {
       WHERE t.league = $1
         AND t.season = $2
         AND t.is_excluded = FALSE
-      ORDER BY tr.rpi DESC NULLS LAST
     `, [league, season]);
 
     const teams = teamsResult.rows;
@@ -150,12 +141,6 @@ router.get('/api/bracketcast', async (req, res) => {
       };
     });
 
-    // Create RPI rank lookup (1-indexed)
-    const rpiRanks = {};
-    teams.forEach((team, idx) => {
-      rpiRanks[team.team_id] = team.rpi ? idx + 1 : null;
-    });
-
     // Step 2: Get all NAIA games for quadrant calculation
     // Exclude national tournament games since bracketcast is for projecting seeds
     // Filter by asOfDate if provided
@@ -177,7 +162,92 @@ router.get('/api/bracketcast', async (req, res) => {
         AND ($3::date IS NULL OR g.game_date <= $3::date)
     `, [league, season, asOfDate]);
 
-    // Step 3: Calculate quadrant records for each team
+    // Step 3: Calculate RPI on-the-fly from the date-filtered games
+    // This ensures RPI rankings reflect only games up to the asOfDate
+    const naiaTeamIds = new Set(teams.map(t => String(t.team_id)));
+    const teamGameRecords = {};
+
+    // Initialize records for all teams
+    teams.forEach(t => {
+      teamGameRecords[t.team_id] = { opponents: [] };
+    });
+
+    // Build opponent lists from date-filtered NAIA games
+    gamesResult.rows.forEach(game => {
+      if (!teamGameRecords[game.team_id]) return;
+      const isWin = game.team_score > game.opponent_score;
+      if (naiaTeamIds.has(String(game.opponent_id))) {
+        teamGameRecords[game.team_id].opponents.push({
+          id: game.opponent_id,
+          isWin,
+        });
+      }
+    });
+
+    // Step 3a: Win percentages (NAIA only)
+    const winPcts = {};
+    for (const [teamId, rec] of Object.entries(teamGameRecords)) {
+      const naiaWins = rec.opponents.filter(o => o.isWin).length;
+      const naiaGames = rec.opponents.length;
+      winPcts[teamId] = naiaGames > 0 ? naiaWins / naiaGames : 0;
+    }
+
+    // Step 3b: OWP (Opponent Win Percentage) - excludes games against the team itself
+    const owpCalc = {};
+    for (const [teamId, rec] of Object.entries(teamGameRecords)) {
+      let totalOppWins = 0, totalOppLosses = 0;
+      let winsAgainstUs = 0, lossesAgainstUs = 0;
+
+      for (const opp of rec.opponents) {
+        const oppRec = teamGameRecords[opp.id];
+        if (!oppRec) continue;
+        const oppNaiaWins = oppRec.opponents.filter(o => o.isWin).length;
+        const oppNaiaLosses = oppRec.opponents.filter(o => !o.isWin).length;
+        totalOppWins += oppNaiaWins;
+        totalOppLosses += oppNaiaLosses;
+        if (opp.isWin) lossesAgainstUs++;
+        else winsAgainstUs++;
+      }
+
+      const adjWins = totalOppWins - winsAgainstUs;
+      const adjLosses = totalOppLosses - lossesAgainstUs;
+      const adjTotal = adjWins + adjLosses;
+      owpCalc[teamId] = adjTotal > 0 ? adjWins / adjTotal : 0;
+    }
+
+    // Step 3c: OOWP (Opponent's Opponent Win Percentage)
+    const oowpCalc = {};
+    for (const [teamId, rec] of Object.entries(teamGameRecords)) {
+      let total = 0, count = 0;
+      for (const opp of rec.opponents) {
+        if (owpCalc[opp.id] !== undefined) {
+          total += owpCalc[opp.id];
+          count++;
+        }
+      }
+      oowpCalc[teamId] = count > 0 ? total / count : 0;
+    }
+
+    // Step 3d: RPI = 0.30*WP + 0.50*OWP + 0.20*OOWP; SOS = 0.67*OWP + 0.33*OOWP
+    for (const team of teams) {
+      const tid = team.team_id;
+      const wp = winPcts[tid] || 0;
+      const owp = owpCalc[tid] || 0;
+      const oowp = oowpCalc[tid] || 0;
+      team.rpi = (0.30 * wp + 0.50 * owp + 0.20 * oowp) || null;
+      team.strength_of_schedule = (0.67 * owp + 0.33 * oowp) || null;
+      team.opponent_win_pct = owp;
+      team.opponent_opponent_win_pct = oowp;
+    }
+
+    // Re-sort teams by calculated RPI and rebuild rankings
+    teams.sort((a, b) => (parseFloat(b.rpi) || 0) - (parseFloat(a.rpi) || 0));
+    const rpiRanks = {};
+    teams.forEach((team, idx) => {
+      rpiRanks[team.team_id] = team.rpi ? idx + 1 : null;
+    });
+
+    // Step 4: Calculate quadrant records for each team
     const quadrantRecords = {};
     const conferenceRecords = {};
 
@@ -215,7 +285,7 @@ router.get('/api/bracketcast', async (req, res) => {
       }
     });
 
-    // Step 4: Calculate SOS rankings (higher SOS = better = lower rank number)
+    // Step 5: Calculate SOS rankings (higher SOS = better = lower rank number)
     const teamsWithSos = teams
       .filter(t => t.strength_of_schedule != null)
       .sort((a, b) => parseFloat(b.strength_of_schedule) - parseFloat(a.strength_of_schedule));

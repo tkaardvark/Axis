@@ -591,6 +591,16 @@ async function getBoxScorePlayerStats(pool, filters) {
     params.push(team);
     paramIndex++;
   }
+  if (position) {
+    whereConditions.push(`pl.position ILIKE $${paramIndex}`);
+    params.push(`%${position}%`);
+    paramIndex++;
+  }
+  if (year) {
+    whereConditions.push(`pl.year ILIKE $${paramIndex}`);
+    params.push(`%${year}%`);
+    paramIndex++;
+  }
 
   const validSortColumns = [
     'pts_pg', 'reb_pg', 'ast_pg', 'stl_pg', 'blk_pg', 'to_pg',
@@ -612,6 +622,11 @@ async function getBoxScorePlayerStats(pool, filters) {
         t.conference,
         t.logo_url as team_logo_url,
         t.primary_color as team_primary_color,
+        COALESCE(pl.first_name, SPLIT_PART(p.player_name, ' ', 1)) as first_name,
+        COALESCE(pl.last_name, NULLIF(SUBSTRING(p.player_name FROM POSITION(' ' IN p.player_name) + 1), '')) as last_name,
+        COALESCE(MAX(pl.uniform), MIN(p.uniform_number)) as uniform,
+        pl.position,
+        pl.year,
         COUNT(*) as gp,
         SUM(p.pts) as pts,
         SUM(p.reb) as reb,
@@ -644,8 +659,9 @@ async function getBoxScorePlayerStats(pool, filters) {
       FROM exp_player_game_stats p
       JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
       JOIN teams t ON t.name = p.team_name AND t.season = p.season
+      LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = p.season
       WHERE ${whereConditions.join(' AND ')} AND g.is_exhibition = false
-      GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color
+      GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, pl.position, pl.year
       HAVING COUNT(*) >= ${parseInt(min_gp) || 0}
     )
     SELECT * FROM player_seasons
@@ -663,11 +679,244 @@ async function getBoxScorePlayerStats(pool, filters) {
       FROM exp_player_game_stats p
       JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
       JOIN teams t ON t.name = p.team_name AND t.season = p.season
+      LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = p.season
       WHERE ${whereConditions.join(' AND ')} AND g.is_exhibition = false
-      GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color
+      GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, pl.position, pl.year
       HAVING COUNT(*) >= ${parseInt(min_gp) || 0}
     ) sub
   `;
+  const countResult = await pool.query(countQuery, params.slice(0, -2));
+
+  return {
+    players: result.rows,
+    total: parseInt(countResult.rows[0].total),
+  };
+}
+
+/**
+ * Get per-player clutch time stats computed from play-by-play data.
+ * Clutch = last 5 minutes of regulation (period 2) with score diff <= 5 pts,
+ * plus ALL overtime periods with score diff <= 5 pts.
+ *
+ * Extracts individual player actions (made/missed shots, FTs, rebounds, assists,
+ * steals, turnovers, blocks) during clutch time and aggregates per player per season.
+ */
+async function getClutchPlayerStats(pool, filters) {
+  const {
+    league = 'mens',
+    season = DEFAULT_SEASON,
+    conference,
+    team_id,
+    team,
+    position,
+    year,
+    sort_by = 'clutch_ppg',
+    sort_order = 'DESC',
+    limit = 100,
+    offset = 0,
+    min_gp = 5,
+  } = filters;
+
+  // Build WHERE conditions for team/player filters
+  let teamWhereConditions = ['t.league = $1', 't.season = $2', 't.is_excluded = FALSE'];
+  let params = [league, season];
+  let paramIndex = 3;
+
+  if (conference) {
+    teamWhereConditions.push(`t.conference = $${paramIndex}`);
+    params.push(conference);
+    paramIndex++;
+  }
+  if (team_id) {
+    teamWhereConditions.push(`t.team_id = $${paramIndex}`);
+    params.push(team_id);
+    paramIndex++;
+  }
+  if (team) {
+    teamWhereConditions.push(`t.name = $${paramIndex}`);
+    params.push(team);
+    paramIndex++;
+  }
+  if (position) {
+    teamWhereConditions.push(`pl.position ILIKE $${paramIndex}`);
+    params.push(`%${position}%`);
+    paramIndex++;
+  }
+  if (year) {
+    teamWhereConditions.push(`pl.year ILIKE $${paramIndex}`);
+    params.push(`%${year}%`);
+    paramIndex++;
+  }
+
+  const validSortColumns = [
+    'clutch_ppg', 'clutch_pts', 'clutch_games', 'clutch_fgm', 'clutch_fga', 'clutch_fg_pct',
+    'clutch_3pm', 'clutch_3pa', 'clutch_3p_pct', 'clutch_ftm', 'clutch_fta', 'clutch_ft_pct',
+    'clutch_ast', 'clutch_ast_pg', 'clutch_reb', 'clutch_reb_pg',
+    'clutch_stl', 'clutch_stl_pg', 'clutch_to', 'clutch_to_pg',
+    'gp', 'pts_pg',
+  ];
+  const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'clutch_ppg';
+  const order = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+  // PBP player_name is LASTNAME,FIRSTNAME. Convert to "Firstname Lastname" for matching.
+  // SQL: INITCAP(TRIM(SPLIT_PART(pbp_name, ',', 2))) || ' ' || INITCAP(TRIM(SPLIT_PART(pbp_name, ',', 1)))
+  const pbpNameToNormal = `INITCAP(TRIM(SPLIT_PART(cp.player_name, ',', 2))) || ' ' || INITCAP(TRIM(SPLIT_PART(cp.player_name, ',', 1)))`;
+
+  const query = `
+    WITH clutch_plays AS (
+      SELECT
+        p.game_box_score_id,
+        p.player_name,
+        p.team_name,
+        p.action_type,
+        p.is_scoring_play,
+        p.season
+      FROM exp_play_by_play p
+      JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
+      WHERE p.season = $2
+        AND g.is_exhibition = false
+        AND g.league = $1
+        AND p.player_name IS NOT NULL
+        AND p.player_name != ''
+        AND p.player_name LIKE '%,%'
+        AND (
+          (p.period = 2 AND p.game_clock <= '05:00' AND ABS(p.home_score - p.away_score) <= 5)
+          OR (p.period > 2 AND ABS(p.home_score - p.away_score) <= 5)
+        )
+    ),
+    player_clutch AS (
+      SELECT
+        cp.player_name as pbp_name,
+        ${pbpNameToNormal} as player_name_normal,
+        cp.team_name,
+        cp.season,
+        COUNT(DISTINCT cp.game_box_score_id) as clutch_games,
+        SUM(CASE WHEN cp.action_type = 'made_fg' THEN 2 WHEN cp.action_type = 'made_3pt' THEN 3 WHEN cp.action_type = 'made_ft' THEN 1 ELSE 0 END) as clutch_pts,
+        SUM(CASE WHEN cp.action_type = 'made_fg' THEN 1 ELSE 0 END) as clutch_fgm_2pt,
+        SUM(CASE WHEN cp.action_type = 'made_3pt' THEN 1 ELSE 0 END) as clutch_3pm,
+        SUM(CASE WHEN cp.action_type = 'missed_fg' THEN 1 ELSE 0 END) as clutch_miss_2pt,
+        SUM(CASE WHEN cp.action_type = 'missed_3pt' THEN 1 ELSE 0 END) as clutch_miss_3pt,
+        SUM(CASE WHEN cp.action_type = 'made_ft' THEN 1 ELSE 0 END) as clutch_ftm,
+        SUM(CASE WHEN cp.action_type = 'missed_ft' THEN 1 ELSE 0 END) as clutch_miss_ft,
+        SUM(CASE WHEN cp.action_type = 'assist' THEN 1 ELSE 0 END) as clutch_ast,
+        SUM(CASE WHEN cp.action_type IN ('rebound_off', 'rebound_def') THEN 1 ELSE 0 END) as clutch_reb,
+        SUM(CASE WHEN cp.action_type = 'steal' THEN 1 ELSE 0 END) as clutch_stl,
+        SUM(CASE WHEN cp.action_type = 'turnover' THEN 1 ELSE 0 END) as clutch_to,
+        SUM(CASE WHEN cp.action_type = 'block' THEN 1 ELSE 0 END) as clutch_blk
+      FROM clutch_plays cp
+      GROUP BY cp.player_name, cp.team_name, cp.season
+    ),
+    overall AS (
+      SELECT
+        ps.player_name,
+        ps.player_id,
+        ps.team_name,
+        ps.season,
+        COUNT(*) as gp,
+        ROUND(SUM(ps.pts)::numeric / NULLIF(COUNT(*), 0), 1) as pts_pg
+      FROM exp_player_game_stats ps
+      JOIN exp_game_box_scores g2 ON g2.id = ps.game_box_score_id
+      WHERE ps.season = $2 AND g2.is_exhibition = false AND g2.league = $1
+      GROUP BY ps.player_name, ps.player_id, ps.team_name, ps.season
+    ),
+    combined AS (
+      SELECT
+        pc.pbp_name,
+        pc.player_name_normal,
+        pc.team_name,
+        t.team_id,
+        t.conference,
+        t.logo_url as team_logo_url,
+        t.primary_color as team_primary_color,
+        COALESCE(pl.first_name, SPLIT_PART(pc.player_name_normal, ' ', 1)) as first_name,
+        COALESCE(pl.last_name, NULLIF(SUBSTRING(pc.player_name_normal FROM POSITION(' ' IN pc.player_name_normal) + 1), '')) as last_name,
+        MAX(pl.uniform) as uniform,
+        MAX(pl.position) as position,
+        MAX(pl.year) as year,
+        COALESCE(ov.gp, 0) as gp,
+        COALESCE(ov.pts_pg, 0) as pts_pg,
+        pc.clutch_games,
+        pc.clutch_pts,
+        ROUND(pc.clutch_pts::numeric / NULLIF(pc.clutch_games, 0), 1) as clutch_ppg,
+        (pc.clutch_fgm_2pt + pc.clutch_3pm) as clutch_fgm,
+        (pc.clutch_fgm_2pt + pc.clutch_3pm + pc.clutch_miss_2pt + pc.clutch_miss_3pt) as clutch_fga,
+        ROUND((pc.clutch_fgm_2pt + pc.clutch_3pm)::numeric / NULLIF(pc.clutch_fgm_2pt + pc.clutch_3pm + pc.clutch_miss_2pt + pc.clutch_miss_3pt, 0), 3) as clutch_fg_pct,
+        pc.clutch_3pm,
+        (pc.clutch_3pm + pc.clutch_miss_3pt) as clutch_3pa,
+        ROUND(pc.clutch_3pm::numeric / NULLIF(pc.clutch_3pm + pc.clutch_miss_3pt, 0), 3) as clutch_3p_pct,
+        pc.clutch_ftm,
+        (pc.clutch_ftm + pc.clutch_miss_ft) as clutch_fta,
+        ROUND(pc.clutch_ftm::numeric / NULLIF(pc.clutch_ftm + pc.clutch_miss_ft, 0), 3) as clutch_ft_pct,
+        pc.clutch_ast,
+        ROUND(pc.clutch_ast::numeric / NULLIF(pc.clutch_games, 0), 1) as clutch_ast_pg,
+        pc.clutch_reb,
+        ROUND(pc.clutch_reb::numeric / NULLIF(pc.clutch_games, 0), 1) as clutch_reb_pg,
+        pc.clutch_stl,
+        ROUND(pc.clutch_stl::numeric / NULLIF(pc.clutch_games, 0), 1) as clutch_stl_pg,
+        pc.clutch_to,
+        ROUND(pc.clutch_to::numeric / NULLIF(pc.clutch_games, 0), 1) as clutch_to_pg,
+        pc.clutch_blk
+      FROM player_clutch pc
+      JOIN teams t ON t.name = pc.team_name AND t.season = pc.season
+      LEFT JOIN overall ov ON UPPER(ov.player_name) = UPPER(pc.player_name_normal)
+        AND ov.team_name = pc.team_name AND ov.season = pc.season
+      LEFT JOIN players pl ON pl.player_id = ov.player_id AND pl.season = pc.season
+      WHERE ${teamWhereConditions.join(' AND ')}
+      GROUP BY pc.pbp_name, pc.player_name_normal, pc.team_name, t.team_id, t.conference, t.logo_url, t.primary_color,
+        pl.first_name, pl.last_name,
+        ov.gp, ov.pts_pg,
+        pc.clutch_games, pc.clutch_pts, pc.clutch_fgm_2pt, pc.clutch_3pm, pc.clutch_miss_2pt, pc.clutch_miss_3pt,
+        pc.clutch_ftm, pc.clutch_miss_ft, pc.clutch_ast, pc.clutch_reb, pc.clutch_stl, pc.clutch_to, pc.clutch_blk
+      HAVING COALESCE(ov.gp, 0) >= ${parseInt(min_gp) || 0}
+    )
+    SELECT * FROM combined
+    ORDER BY ${sortColumn} ${order} NULLS LAST
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+  params.push(parseInt(limit) || 100, parseInt(offset) || 0);
+
+  const result = await pool.query(query, params);
+
+  // Count query
+  const countQuery = `
+    WITH clutch_plays AS (
+      SELECT p.game_box_score_id, p.player_name, p.team_name, p.season
+      FROM exp_play_by_play p
+      JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
+      WHERE p.season = $2 AND g.is_exhibition = false AND g.league = $1
+        AND p.player_name IS NOT NULL AND p.player_name != '' AND p.player_name LIKE '%,%'
+        AND (
+          (p.period = 2 AND p.game_clock <= '05:00' AND ABS(p.home_score - p.away_score) <= 5)
+          OR (p.period > 2 AND ABS(p.home_score - p.away_score) <= 5)
+        )
+    ),
+    player_clutch AS (
+      SELECT cp.player_name as pbp_name,
+        INITCAP(TRIM(SPLIT_PART(cp.player_name, ',', 2))) || ' ' || INITCAP(TRIM(SPLIT_PART(cp.player_name, ',', 1))) as player_name_normal,
+        cp.team_name, cp.season
+      FROM clutch_plays cp
+      GROUP BY cp.player_name, cp.team_name, cp.season
+    ),
+    overall AS (
+      SELECT ps.player_name, ps.player_id, ps.team_name, ps.season, COUNT(*) as gp
+      FROM exp_player_game_stats ps
+      JOIN exp_game_box_scores g2 ON g2.id = ps.game_box_score_id
+      WHERE ps.season = $2 AND g2.is_exhibition = false AND g2.league = $1
+      GROUP BY ps.player_name, ps.player_id, ps.team_name, ps.season
+    )
+    SELECT COUNT(*) as total FROM (
+      SELECT pc.pbp_name
+      FROM player_clutch pc
+      JOIN teams t ON t.name = pc.team_name AND t.season = pc.season
+      LEFT JOIN overall ov ON UPPER(ov.player_name) = UPPER(pc.player_name_normal)
+        AND ov.team_name = pc.team_name AND ov.season = pc.season
+      LEFT JOIN players pl ON pl.player_id = ov.player_id AND pl.season = pc.season
+      WHERE ${teamWhereConditions.join(' AND ')}
+        AND COALESCE(ov.gp, 0) >= ${parseInt(min_gp) || 0}
+      GROUP BY pc.pbp_name, pc.player_name_normal, pc.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, ov.gp
+    ) sub
+  `;
+
   const countResult = await pool.query(countQuery, params.slice(0, -2));
 
   return {
@@ -680,6 +929,7 @@ module.exports = {
   calculateDynamicStatsFromBoxScores,
   getBoxScoreGamesForTeam,
   getBoxScorePlayerStats,
+  getClutchPlayerStats,
   getTeamScoringRuns,
 };
 

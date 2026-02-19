@@ -714,6 +714,35 @@ router.get('/api/teams/:teamId/schedule', async (req, res) => {
     let rawGames;
     if (useBoxScore) {
       rawGames = await getBoxScoreGamesForTeam(pool, teamId, season);
+
+      // Box score source only has completed games — fetch future games from the games table
+      const futureResult = await pool.query(
+        `SELECT
+          g.game_id,
+          g.game_date,
+          g.location,
+          g.opponent_name,
+          g.opponent_id,
+          g.team_score,
+          g.opponent_score,
+          g.is_conference,
+          g.is_naia_game,
+          g.is_exhibition,
+          g.is_postseason,
+          g.is_national_tournament,
+          g.is_completed,
+          g.fga, g.oreb, g.turnovers, g.fta,
+          g.opp_fga, g.opp_oreb, g.opp_turnovers, g.opp_fta,
+          t.name as opponent_team_name,
+          t.logo_url as opponent_logo_url
+         FROM games g
+         LEFT JOIN teams t ON g.opponent_id = t.team_id AND t.season = $2
+         WHERE g.team_id = $1 AND g.season = $2 AND g.is_completed = FALSE
+         ORDER BY g.game_date ASC`,
+        [teamId, season]
+      );
+      rawGames = [...rawGames, ...futureResult.rows];
+
       // Sort ascending for schedule display (getBoxScoreGamesForTeam returns DESC)
       rawGames.sort((a, b) => new Date(a.game_date) - new Date(b.game_date));
     } else {

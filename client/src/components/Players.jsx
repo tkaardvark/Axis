@@ -6,6 +6,7 @@ import PlayerVisualizations from './PlayerVisualizations';
 
 import { API_URL } from '../utils/api';
 import { normalizeYear, normalizePosition } from '../utils/normalizers';
+import { TOOLTIPS } from '../utils/tooltips';
 import SkeletonLoader from './SkeletonLoader';
 import { exportToCSV } from '../utils/csv';
 
@@ -76,6 +77,25 @@ const STAT_GROUPS = {
       { key: 'pf', label: 'PF', format: 'int' },
     ],
     defaultSort: { key: 'stl_pg', dir: 'DESC' },
+  },
+  Clutch: {
+    columns: [
+      { key: 'gp', label: 'GP', format: 'int' },
+      { key: 'clutch_games', label: 'CG', format: 'int' },
+      { key: 'clutch_pts', label: 'CPTS', format: 'int' },
+      { key: 'clutch_ppg', label: 'CPPG', format: 'rating1' },
+      { key: 'clutch_fgm', label: 'CFGM', format: 'int' },
+      { key: 'clutch_fga', label: 'CFGA', format: 'int' },
+      { key: 'clutch_fg_pct', label: 'CFG%', format: 'pct1' },
+      { key: 'clutch_ftm', label: 'CFTM', format: 'int' },
+      { key: 'clutch_fta', label: 'CFTA', format: 'int' },
+      { key: 'clutch_ft_pct', label: 'CFT%', format: 'pct1' },
+      { key: 'clutch_ast', label: 'CAST', format: 'int' },
+      { key: 'clutch_reb', label: 'CREB', format: 'int' },
+      { key: 'clutch_to', label: 'CTO', format: 'int' },
+    ],
+    defaultSort: { key: 'clutch_fgm', dir: 'DESC' },
+    boxscoreOnly: true,
   },
 };
 
@@ -150,6 +170,9 @@ function Players({ league, season, conferences, sourceParam = '' }) {
       url += `&sort_by=${sort.key}&sort_order=${sort.dir}`;
       url += `&limit=${pageSize}&offset=${page * pageSize}`;
       url += `&min_gp=${filters.minGp}`;
+      if (statGroup === 'Clutch') {
+        url += `&stat_group=Clutch`;
+      }
       
       if (filters.conference) {
         url += `&conference=${encodeURIComponent(filters.conference)}`;
@@ -175,7 +198,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
     } finally {
       setLoading(false);
     }
-  }, [league, season, sort, page, filters, sourceParam]);
+  }, [league, season, sort, page, filters, sourceParam, statGroup]);
 
   useEffect(() => {
     fetchPlayers();
@@ -380,7 +403,13 @@ function Players({ league, season, conferences, sourceParam = '' }) {
         <>
           {/* Stat Group Tabs */}
           <div className="stat-group-tabs">
-            {Object.keys(STAT_GROUPS).map(group => (
+            {Object.keys(STAT_GROUPS).filter(group => {
+              // Only show boxscoreOnly tabs when not in legacy mode
+              if (STAT_GROUPS[group].boxscoreOnly && sourceParam === '&source=legacy') {
+                return false;
+              }
+              return true;
+            }).map(group => (
               <button
                 key={group}
                 className={`stat-group-tab ${statGroup === group ? 'active' : ''}`}
@@ -436,6 +465,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
                       key={col.key}
                       className={`stat-col sortable ${sort.key === col.key ? 'sorted' : ''}`}
                       onClick={() => handleSort(col)}
+                      title={TOOLTIPS[col.key] || col.label}
                     >
                       {col.label}
                       {sort.key === col.key && (

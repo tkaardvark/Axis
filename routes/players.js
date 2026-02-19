@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
-const { getBoxScorePlayerStats } = require('../utils/dynamicStatsBoxScore');
+const { getBoxScorePlayerStats, getClutchPlayerStats } = require('../utils/dynamicStatsBoxScore');
 const { resolveSource } = require('../utils/dataSource');
 
 // Get all players (with filtering and sorting)
@@ -21,9 +21,25 @@ router.get('/api/players', async (req, res) => {
       offset = 0,
       min_gp = 5,  // Minimum games played filter
       source,
+      stat_group,
     } = req.query;
 
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+
+    if (useBoxScore && stat_group === 'Clutch') {
+      const result = await getClutchPlayerStats(pool, {
+        league, season, conference, team_id, team, position, year,
+        sort_by, sort_order, limit, offset, min_gp,
+      });
+      return res.json({
+        players: result.players,
+        total: result.total,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        source: 'boxscore',
+        stat_group: 'Clutch',
+      });
+    }
 
     if (useBoxScore) {
       const result = await getBoxScorePlayerStats(pool, {
