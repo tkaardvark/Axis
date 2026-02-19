@@ -93,6 +93,20 @@ export const TOOLTIPS = {
   qwi: 'Quality Win Index - Weighted sum of quadrant wins minus quadrant losses. Q1W×1.0 - Q1L×0.25 + Q2W×0.6 - Q2L×0.5 + Q3W×0.3 - Q3L×0.75 + Q4W×0.1 - Q4L×1.0',
   power_index: 'Power Index - Composite metric: 35% AdjORTG + 35% Inverted AdjDRTG + 15% SOS + 7.5% NAIA Win% + 7.5% QWI',
 
+  // ── Game Flow ──
+  lead_changes_per_game: 'Lead Changes Per Game - Average number of lead changes. Higher values indicate more competitive games.',
+  ties_per_game: 'Times Tied Per Game - Average number of ties. Higher values indicate more back-and-forth games.',
+  avg_largest_lead: 'Average Largest Lead - Average of the largest lead held in each game. Higher means more dominant performances.',
+  avg_opp_largest_lead: 'Average Opponent Largest Lead - Average of the largest lead opponents hold. Lower is better.',
+  close_record: 'Close Game Record - Win-Loss record in games decided by 5 or fewer points.',
+  blowout_record: 'Blowout Record - Win-Loss record in games decided by 15 or more points.',
+  half_lead_win_pct: 'Lead at Half Win% - Win percentage when leading at halftime. Shows ability to close out games.',
+  comeback_win_pct: 'Comeback Win% - Win percentage when trailing at halftime. Shows resilience and second-half adjustments.',
+  second_chance_per_game: 'Second Chance Points Per Game - Points scored on offensive rebounds.',
+  opp_second_chance_per_game: 'Opponent Second Chance Pts - Second chance points allowed per game. Lower is better.',
+  runs_scored_per_game: '10-0 Runs Per Game - Average number of 10+ point unanswered scoring runs per game.',
+  runs_allowed_per_game: '10-0 Runs Allowed Per Game - Average 10+ point unanswered runs allowed per game. Lower is better.',
+
   // ── Bracketcast-specific ──
   rank: 'Rank - Dynamic ranking based on current sort column',
   area: 'Geographic Area - East, Midwest, North, South, or West',

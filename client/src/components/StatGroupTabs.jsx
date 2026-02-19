@@ -1,16 +1,18 @@
 import './StatGroupTabs.css';
 
-const STAT_GROUPS = [
+const DEFAULT_GROUPS = [
   { key: 'Efficiency', label: 'Efficiency' },
   { key: 'Offense', label: 'Offense' },
   { key: 'Defense', label: 'Defense' },
+  { key: 'GameFlow', label: 'Game Flow' },
   { key: 'Experimental', label: 'Experimental' },
 ];
 
-function StatGroupTabs({ active, onChange }) {
+function StatGroupTabs({ active, onChange, groups }) {
+  const items = groups || DEFAULT_GROUPS;
   return (
     <div className="stat-group-tabs">
-      {STAT_GROUPS.map((group) => (
+      {items.map((group) => (
         <button
           key={group.key}
           className={`stat-group-tab ${active === group.key ? 'active' : ''}`}

@@ -28,6 +28,8 @@
 .header-right {
   flex: 1;
   display: flex;
+  align-items: center;
+  gap: 10px;
   justify-content: flex-end;
 }
 
@@ -78,6 +80,53 @@
 .theme-toggle svg {
   width: 20px;
   height: 20px;
+}
+
+/* Data source toggle */
+.source-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 18px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.source-toggle:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-text-tertiary);
+}
+
+.source-toggle.active {
+  background-color: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
+  color: #fff;
+}
+
+.source-toggle.active:hover {
+  opacity: 0.9;
+}
+
+.source-toggle.legacy {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.source-toggle svg {
+  flex-shrink: 0;
+}
+
+.source-toggle-label {
+  line-height: 1;
 }
 
 /* Navigation bar - Dropdowns | Page buttons */
@@ -254,6 +303,15 @@
   .theme-toggle svg {
     width: 18px;
     height: 18px;
+  }
+
+  .source-toggle-label {
+    display: none;
+  }
+
+  .source-toggle {
+    padding: 0 8px;
+    height: 32px;
   }
 
   .header-nav {

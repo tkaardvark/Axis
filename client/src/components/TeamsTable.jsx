@@ -76,6 +76,24 @@ const STAT_GROUPS = {
     ],
     defaultSort: { key: 'power_index', dir: 'desc' },
   },
+  GameFlow: {
+    columns: [
+      { key: 'record', label: 'Record', format: 'record', sortKey: 'wins' },
+      { key: 'lead_changes_per_game', label: 'LC/G', format: 'rating' },
+      { key: 'ties_per_game', label: 'Ties/G', format: 'rating' },
+      { key: 'avg_largest_lead', label: 'Avg Lead', format: 'rating' },
+      { key: 'avg_opp_largest_lead', label: 'Opp Lead', format: 'rating', lowerIsBetter: true },
+      { key: 'close_record', label: 'Close', format: 'record', sortKey: 'close_wins' },
+      { key: 'blowout_record', label: 'Blowout', format: 'record', sortKey: 'blowout_wins' },
+      { key: 'half_lead_win_pct', label: 'Lead@Half W%', format: 'pct1' },
+      { key: 'comeback_win_pct', label: 'Comeback W%', format: 'pct1' },
+      { key: 'second_chance_per_game', label: '2nd Ch', format: 'rating' },
+      { key: 'opp_second_chance_per_game', label: 'Opp 2nd', format: 'rating', lowerIsBetter: true },
+      { key: 'runs_scored_per_game', label: '10-0 Run', format: 'rating2' },
+      { key: 'runs_allowed_per_game', label: '10-0 Alwd', format: 'rating2', lowerIsBetter: true },
+    ],
+    defaultSort: { key: 'avg_largest_lead', dir: 'desc' },
+  },
 };
 
 function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick, onConferenceClick }) {
@@ -218,6 +236,12 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick, onCon
     }
     if (key === 'naia_record') {
       return `${team.naia_wins || 0}-${team.naia_losses || 0}`;
+    }
+    if (key === 'close_record') {
+      return `${team.close_wins || 0}-${team.close_losses || 0}`;
+    }
+    if (key === 'blowout_record') {
+      return `${team.blowout_wins || 0}-${team.blowout_losses || 0}`;
     }
 
     const value = team[key];

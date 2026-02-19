@@ -1,19 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
-const { calculateDynamicStats } = require('../utils/dynamicStats');
+const { calculateDynamicStats } = require('../utils/legacy/dynamicStats');
+const { calculateDynamicStatsFromBoxScores } = require('../utils/dynamicStatsBoxScore');
+const { resolveSource } = require('../utils/dataSource');
 
 // Get matchup comparison data for two teams
 router.get('/api/matchup', async (req, res) => {
   try {
-    const { team1, team2, season = DEFAULT_SEASON, league = 'mens' } = req.query;
+    const { team1, team2, season = DEFAULT_SEASON, league = 'mens', source } = req.query;
 
     if (!team1 || !team2) {
       return res.status(400).json({ error: 'Both team1 and team2 parameters are required' });
     }
 
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+    const statsFunc = useBoxScore ? calculateDynamicStatsFromBoxScores : calculateDynamicStats;
+
     // Get all teams' stats for percentile calculations
-    const allTeamsResult = await calculateDynamicStats(pool, {
+    const allTeamsResult = await statsFunc(pool, {
       league,
       gameType: 'all',
       seasonType: 'all',
@@ -192,7 +197,130 @@ router.get('/api/matchup', async (req, res) => {
 router.get('/api/games/:gameId/boxscore', async (req, res) => {
   try {
     const { gameId } = req.params;
-    const { season = DEFAULT_SEASON } = req.query;
+    const { season = DEFAULT_SEASON, source, league } = req.query;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+
+    if (useBoxScore) {
+      // Fetch from exp_game_box_scores
+      const result = await pool.query(
+        `SELECT
+          e.*,
+          t1.team_id as away_tid, t1.logo_url as away_logo_url,
+          t2.team_id as home_tid, t2.logo_url as home_logo_url
+         FROM exp_game_box_scores e
+         LEFT JOIN teams t1 ON t1.name = e.away_team_name AND t1.season = e.season AND t1.league = e.league
+         LEFT JOIN teams t2 ON t2.name = e.home_team_name AND t2.season = e.season AND t2.league = e.league
+         WHERE e.id = $1 AND e.season = $2`,
+        [gameId, season]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Game not found' });
+      }
+
+      const g = result.rows[0];
+
+      // Fetch player stats for this game
+      const playerResult = await pool.query(
+        `SELECT player_name, uniform_number, is_starter, is_home,
+                minutes, fgm, fga, fgm3, fga3, ftm, fta,
+                oreb, dreb, reb, ast, stl, blk, turnovers, pf, pts
+         FROM exp_player_game_stats
+         WHERE game_box_score_id = $1 AND season = $2
+         ORDER BY is_home, is_starter DESC, pts DESC`,
+        [gameId, season]
+      );
+
+      // Fetch scoring progression from play-by-play
+      const pbpResult = await pool.query(
+        `SELECT period, game_clock, sequence_number, away_score, home_score
+         FROM exp_play_by_play
+         WHERE game_box_score_id = $1 AND season = $2 AND is_scoring_play = true
+         ORDER BY sequence_number`,
+        [gameId, season]
+      );
+
+      const awayPlayers = playerResult.rows.filter(p => !p.is_home).map(p => ({
+        name: p.player_name,
+        uniform: p.uniform_number,
+        starter: p.is_starter,
+        min: p.minutes, fgm: p.fgm, fga: p.fga, fgm3: p.fgm3, fga3: p.fga3,
+        ftm: p.ftm, fta: p.fta, oreb: p.oreb, dreb: p.dreb, reb: p.reb,
+        ast: p.ast, stl: p.stl, blk: p.blk, to: p.turnovers, pf: p.pf, pts: p.pts,
+      }));
+
+      const homePlayers = playerResult.rows.filter(p => p.is_home).map(p => ({
+        name: p.player_name,
+        uniform: p.uniform_number,
+        starter: p.is_starter,
+        min: p.minutes, fgm: p.fgm, fga: p.fga, fgm3: p.fgm3, fga3: p.fga3,
+        ftm: p.ftm, fta: p.fta, oreb: p.oreb, dreb: p.dreb, reb: p.reb,
+        ast: p.ast, stl: p.stl, blk: p.blk, to: p.turnovers, pf: p.pf, pts: p.pts,
+      }));
+
+      // Build score progression array
+      const scoreProgression = [
+        { period: 1, clock: '20:00', sequence: 0, awayScore: 0, homeScore: 0 },
+      ];
+      for (const play of pbpResult.rows) {
+        scoreProgression.push({
+          period: play.period,
+          clock: play.game_clock,
+          sequence: play.sequence_number,
+          awayScore: play.away_score,
+          homeScore: play.home_score,
+        });
+      }
+
+      return res.json({
+        game_id: g.id,
+        date: g.game_date,
+        location: g.location_text,
+        is_completed: true,
+        period_scores: {
+          away: g.away_period_scores,
+          home: g.home_period_scores,
+        },
+        ties: g.ties,
+        lead_changes: g.lead_changes,
+        attendance: g.attendance,
+        score_progression: scoreProgression,
+        team: {
+          team_id: g.away_tid,
+          name: g.away_team_name,
+          logo_url: g.away_logo_url,
+          score: g.away_score,
+          players: awayPlayers,
+          stats: {
+            fgm: g.away_fgm, fga: g.away_fga, fg_pct: g.away_fga > 0 ? (g.away_fgm / g.away_fga) : null,
+            fgm3: g.away_fgm3, fga3: g.away_fga3, fg3_pct: g.away_fga3 > 0 ? (g.away_fgm3 / g.away_fga3) : null,
+            ftm: g.away_ftm, fta: g.away_fta, ft_pct: g.away_fta > 0 ? (g.away_ftm / g.away_fta) : null,
+            oreb: g.away_oreb, dreb: g.away_dreb, treb: g.away_reb,
+            ast: g.away_ast, stl: g.away_stl, blk: g.away_blk,
+            turnovers: g.away_to, pf: g.away_pf,
+            pts_paint: g.away_points_in_paint, pts_fastbreak: g.away_fastbreak_points,
+            pts_turnovers: g.away_points_off_turnovers, pts_bench: g.away_bench_points,
+          },
+        },
+        opponent: {
+          team_id: g.home_tid,
+          name: g.home_team_name,
+          logo_url: g.home_logo_url,
+          score: g.home_score,
+          players: homePlayers,
+          stats: {
+            fgm: g.home_fgm, fga: g.home_fga, fg_pct: g.home_fga > 0 ? (g.home_fgm / g.home_fga) : null,
+            fgm3: g.home_fgm3, fga3: g.home_fga3, fg3_pct: g.home_fga3 > 0 ? (g.home_fgm3 / g.home_fga3) : null,
+            ftm: g.home_ftm, fta: g.home_fta, ft_pct: g.home_fta > 0 ? (g.home_ftm / g.home_fta) : null,
+            oreb: g.home_oreb, dreb: g.home_dreb, treb: g.home_reb,
+            ast: g.home_ast, stl: g.home_stl, blk: g.home_blk,
+            turnovers: g.home_to, pf: g.home_pf,
+            pts_paint: g.home_points_in_paint, pts_fastbreak: g.home_fastbreak_points,
+            pts_turnovers: g.home_points_off_turnovers, pts_bench: g.home_bench_points,
+          },
+        },
+      });
+    }
 
     const result = await pool.query(
       `SELECT

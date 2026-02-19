@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
-const { calculateDynamicStats } = require('../utils/dynamicStats');
+const { calculateDynamicStats } = require('../utils/legacy/dynamicStats');
+const { calculateDynamicStatsFromBoxScores, getBoxScoreGamesForTeam, getTeamScoringRuns } = require('../utils/dynamicStatsBoxScore');
 const { getConferenceChampions } = require('../utils/conferenceChampions');
 const { getQuadrant } = require('../utils/quadrant');
+const { resolveSource } = require('../utils/dataSource');
 
 // Get team stats with filters - always calculate dynamically from games
 router.get('/api/teams', async (req, res) => {
@@ -15,14 +17,41 @@ router.get('/api/teams', async (req, res) => {
       seasonType = 'all',
       seasonSegment = 'all',
       season = DEFAULT_SEASON,
+      source,
     } = req.query;
 
-    const result = await calculateDynamicStats(pool, { league, conference, gameType, seasonType, seasonSegment, season });
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+    const statsFunc = useBoxScore ? calculateDynamicStatsFromBoxScores : calculateDynamicStats;
+    const result = await statsFunc(pool, { league, conference, gameType, seasonType, seasonSegment, season });
     let teams = result.rows;
 
     // Get total record (all games including non-NAIA, but only completed and non-exhibition)
     // Exclude national tournament games since this matches bracketcast behavior
-    const totalRecordResult = await pool.query(`
+    let totalRecordResult;
+    if (useBoxScore) {
+      totalRecordResult = await pool.query(`
+        WITH flat AS (
+          SELECT t.team_id,
+            e.away_score as team_score, e.home_score as opponent_score
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.name = e.away_team_name AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+          UNION ALL
+          SELECT t.team_id,
+            e.home_score as team_score, e.away_score as opponent_score
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.name = e.home_team_name AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+        )
+        SELECT team_id,
+          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as total_wins,
+          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as total_losses
+        FROM flat GROUP BY team_id
+      `, [league, season]);
+    } else {
+      totalRecordResult = await pool.query(`
       SELECT
         g.team_id,
         SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as total_wins,
@@ -36,6 +65,7 @@ router.get('/api/teams', async (req, res) => {
         AND g.is_national_tournament = FALSE
       GROUP BY g.team_id
     `, [league, season]);
+    }
 
     const totalRecords = {};
     totalRecordResult.rows.forEach(row => {
@@ -161,18 +191,43 @@ router.get('/api/teams', async (req, res) => {
 
     // Add conference records
     try {
-      const confGamesResult = await pool.query(`
-        SELECT g.team_id,
-               SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as conf_wins,
-               SUM(CASE WHEN g.team_score < g.opponent_score THEN 1 ELSE 0 END) as conf_losses
-        FROM games g
-        JOIN teams t ON g.team_id = t.team_id
-        WHERE t.league = $1
-          AND g.season = $2
-          AND g.is_conference = TRUE
-          AND g.is_completed = TRUE
-        GROUP BY g.team_id
-      `, [league, season]);
+      let confGamesResult;
+      if (useBoxScore) {
+        confGamesResult = await pool.query(`
+          WITH flat AS (
+            SELECT t.team_id,
+              e.away_score as team_score, e.home_score as opponent_score
+            FROM exp_game_box_scores e
+            JOIN teams t ON t.name = e.away_team_name AND t.season = e.season
+            WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
+              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            UNION ALL
+            SELECT t.team_id,
+              e.home_score as team_score, e.away_score as opponent_score
+            FROM exp_game_box_scores e
+            JOIN teams t ON t.name = e.home_team_name AND t.season = e.season
+            WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
+              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+          )
+          SELECT team_id,
+            SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as conf_wins,
+            SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as conf_losses
+          FROM flat GROUP BY team_id
+        `, [league, season]);
+      } else {
+        confGamesResult = await pool.query(`
+          SELECT g.team_id,
+                 SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as conf_wins,
+                 SUM(CASE WHEN g.team_score < g.opponent_score THEN 1 ELSE 0 END) as conf_losses
+          FROM games g
+          JOIN teams t ON g.team_id = t.team_id
+          WHERE t.league = $1
+            AND g.season = $2
+            AND g.is_conference = TRUE
+            AND g.is_completed = TRUE
+          GROUP BY g.team_id
+        `, [league, season]);
+      }
 
       const confRecords = {};
       confGamesResult.rows.forEach(row => {
@@ -243,6 +298,27 @@ router.get('/api/teams', async (req, res) => {
       // Continue without projected records
     }
 
+    // Add 10-0 scoring runs from PBP data (box score source only)
+    if (useBoxScore) {
+      try {
+        const runsMap = await getTeamScoringRuns(pool, season, league);
+        teams = teams.map(team => {
+          const r = runsMap.get(team.team_id);
+          if (!r || r.games === 0) {
+            return { ...team, runs_scored_per_game: null, runs_allowed_per_game: null };
+          }
+          return {
+            ...team,
+            runs_scored_per_game: Math.round((r.runs_scored / r.games) * 100) / 100,
+            runs_allowed_per_game: Math.round((r.runs_allowed / r.games) * 100) / 100,
+          };
+        });
+      } catch (runsErr) {
+        console.error('Error computing scoring runs:', runsErr);
+        // Continue without runs data
+      }
+    }
+
     res.json(teams);
   } catch (err) {
     console.error('Error fetching teams:', err);
@@ -254,7 +330,7 @@ router.get('/api/teams', async (req, res) => {
 router.get('/api/teams/:teamId', async (req, res) => {
   try {
     const { teamId } = req.params;
-    const { season = DEFAULT_SEASON } = req.query;
+    const { season = DEFAULT_SEASON, source } = req.query;
 
     const teamResult = await pool.query(
       'SELECT * FROM teams WHERE team_id = $1 AND season = $2',
@@ -265,6 +341,9 @@ router.get('/api/teams/:teamId', async (req, res) => {
       return res.status(404).json({ error: 'Team not found' });
     }
 
+    const league = teamResult.rows[0].league;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+
     const ratingsResult = await pool.query(
       `SELECT * FROM team_ratings
        WHERE team_id = $1 AND season = $2
@@ -273,21 +352,28 @@ router.get('/api/teams/:teamId', async (req, res) => {
       [teamId, season]
     );
 
-    const gamesResult = await pool.query(
-      `SELECT g.*,
-              opp.name as opponent_name,
-              opp.logo_url as opponent_logo
-       FROM games g
-       LEFT JOIN teams opp ON g.opponent_id = opp.team_id AND opp.season = $2
-       WHERE g.team_id = $1 AND g.season = $2
-       ORDER BY g.game_date DESC`,
-      [teamId, season]
-    );
+    let games;
+    if (useBoxScore) {
+      games = await getBoxScoreGamesForTeam(pool, teamId, season);
+    } else {
+      const gamesResult = await pool.query(
+        `SELECT g.*,
+                opp.name as opponent_name,
+                opp.logo_url as opponent_logo
+         FROM games g
+         LEFT JOIN teams opp ON g.opponent_id = opp.team_id AND opp.season = $2
+         WHERE g.team_id = $1 AND g.season = $2
+         ORDER BY g.game_date DESC`,
+        [teamId, season]
+      );
+      games = gamesResult.rows;
+    }
 
     res.json({
       team: teamResult.rows[0],
       ratings: ratingsResult.rows[0] || null,
-      games: gamesResult.rows
+      games,
+      source: useBoxScore ? 'boxscore' : 'default',
     });
   } catch (err) {
     console.error('Error fetching team:', err);
@@ -299,7 +385,12 @@ router.get('/api/teams/:teamId', async (req, res) => {
 router.get('/api/teams/:teamId/splits', async (req, res) => {
   try {
     const { teamId } = req.params;
-    const { season = DEFAULT_SEASON } = req.query;
+    const { season = DEFAULT_SEASON, source } = req.query;
+
+    // Resolve source from team's league
+    const teamCheck = await pool.query('SELECT league FROM teams WHERE team_id = $1 AND season = $2', [teamId, season]);
+    const league = teamCheck.rows[0]?.league || 'mens';
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
     // Helper to calculate stats for a set of games
     const calculateSplitStats = (games) => {
@@ -399,15 +490,20 @@ router.get('/api/teams/:teamId/splits', async (req, res) => {
     };
 
     // Get all completed games for this team (exclude future games)
-    const gamesResult = await pool.query(
-      `SELECT g.*
-       FROM games g
-       WHERE g.team_id = $1 AND g.season = $2 AND g.is_naia_game = true AND g.is_completed = true
-       ORDER BY g.game_date DESC`,
-      [teamId, season]
-    );
-
-    const allGames = gamesResult.rows;
+    let allGames;
+    if (useBoxScore) {
+      const boxGames = await getBoxScoreGamesForTeam(pool, teamId, season);
+      allGames = boxGames.filter(g => !g.is_exhibition);
+    } else {
+      const gamesResult = await pool.query(
+        `SELECT g.*
+         FROM games g
+         WHERE g.team_id = $1 AND g.season = $2 AND g.is_naia_game = true AND g.is_completed = true
+         ORDER BY g.game_date DESC`,
+        [teamId, season]
+      );
+      allGames = gamesResult.rows;
+    }
     if (allGames.length === 0) {
       return res.json({ splits: [] });
     }
@@ -469,7 +565,7 @@ router.get('/api/teams/:teamId/splits', async (req, res) => {
 router.get('/api/teams/:teamId/percentiles', async (req, res) => {
   try {
     const { teamId } = req.params;
-    const { season = DEFAULT_SEASON } = req.query;
+    const { season = DEFAULT_SEASON, source } = req.query;
 
     // Get the team's conference
     const teamResult = await pool.query(
@@ -482,9 +578,11 @@ router.get('/api/teams/:teamId/percentiles', async (req, res) => {
     }
 
     const { conference, league } = teamResult.rows[0];
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
     // Get all teams' stats for percentile calculation
-    const result = await calculateDynamicStats(pool, {
+    const statsFunc = useBoxScore ? calculateDynamicStatsFromBoxScores : calculateDynamicStats;
+    const result = await statsFunc(pool, {
       league,
       gameType: 'all',
       seasonType: 'all',
@@ -568,13 +666,14 @@ router.get('/api/teams/:teamId/percentiles', async (req, res) => {
 router.get('/api/teams/:teamId/schedule', async (req, res) => {
   try {
     const { teamId } = req.params;
-    const { season = DEFAULT_SEASON } = req.query;
+    const { season = DEFAULT_SEASON, source } = req.query;
 
     // First get the league for this team to find correct RPI rankings
     const teamInfo = await pool.query(
       `SELECT league FROM teams WHERE team_id = $1 AND season = $2`, [teamId, season]
     );
     const teamLeague = teamInfo.rows[0]?.league || 'mens';
+    const useBoxScore = resolveSource({ league: teamLeague, season, source }) === 'boxscore';
 
     // Get RPI rankings for all teams in this league (use latest date_calculated)
     const rpiResult = await pool.query(
@@ -612,33 +711,41 @@ router.get('/api/teams/:teamId/schedule', async (req, res) => {
       };
     });
 
-    const gamesResult = await pool.query(
-      `SELECT
-        g.game_id,
-        g.game_date,
-        g.location,
-        g.opponent_name,
-        g.opponent_id,
-        g.team_score,
-        g.opponent_score,
-        g.is_conference,
-        g.is_naia_game,
-        g.is_exhibition,
-        g.is_postseason,
-        g.is_national_tournament,
-        g.is_completed,
-        g.fga, g.oreb, g.turnovers, g.fta,
-        g.opp_fga, g.opp_oreb, g.opp_turnovers, g.opp_fta,
-        t.name as opponent_team_name,
-        t.logo_url as opponent_logo_url
-       FROM games g
-       LEFT JOIN teams t ON g.opponent_id = t.team_id AND t.season = $2
-       WHERE g.team_id = $1 AND g.season = $2
-       ORDER BY g.game_date ASC`,
-      [teamId, season]
-    );
+    let rawGames;
+    if (useBoxScore) {
+      rawGames = await getBoxScoreGamesForTeam(pool, teamId, season);
+      // Sort ascending for schedule display (getBoxScoreGamesForTeam returns DESC)
+      rawGames.sort((a, b) => new Date(a.game_date) - new Date(b.game_date));
+    } else {
+      const gamesResult = await pool.query(
+        `SELECT
+          g.game_id,
+          g.game_date,
+          g.location,
+          g.opponent_name,
+          g.opponent_id,
+          g.team_score,
+          g.opponent_score,
+          g.is_conference,
+          g.is_naia_game,
+          g.is_exhibition,
+          g.is_postseason,
+          g.is_national_tournament,
+          g.is_completed,
+          g.fga, g.oreb, g.turnovers, g.fta,
+          g.opp_fga, g.opp_oreb, g.opp_turnovers, g.opp_fta,
+          t.name as opponent_team_name,
+          t.logo_url as opponent_logo_url
+         FROM games g
+         LEFT JOIN teams t ON g.opponent_id = t.team_id AND t.season = $2
+         WHERE g.team_id = $1 AND g.season = $2
+         ORDER BY g.game_date ASC`,
+        [teamId, season]
+      );
+      rawGames = gamesResult.rows;
+    }
 
-    const games = gamesResult.rows.map(g => {
+    const games = rawGames.map(g => {
       // Determine game type for display
       let gameType = 'NAIA';
       if (g.is_exhibition) {
@@ -744,20 +851,81 @@ router.get('/api/teams/:teamId/schedule', async (req, res) => {
 router.get('/api/teams/:teamId/roster', async (req, res) => {
   try {
     const { teamId } = req.params;
-    const { season = DEFAULT_SEASON } = req.query;
+    const { season = DEFAULT_SEASON, source } = req.query;
 
-    const result = await pool.query(`
-      SELECT
-        p.*,
-        t.name as team_name,
-        t.conference
-      FROM players p
-      JOIN teams t ON p.team_id = t.team_id AND p.season = t.season
-      WHERE p.team_id = $1 AND p.season = $2
-      ORDER BY p.pts_pg DESC
-    `, [teamId, season]);
+    // Resolve source from team's league
+    const teamLeagueCheck = await pool.query('SELECT league FROM teams WHERE team_id = $1 AND season = $2', [teamId, season]);
+    const league = teamLeagueCheck.rows[0]?.league || 'mens';
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
-    res.json({ roster: result.rows });
+    if (useBoxScore) {
+      // Aggregate per-game player stats into season totals from box scores
+      const teamResult = await pool.query('SELECT name FROM teams WHERE team_id = $1 AND season = $2', [teamId, season]);
+      const teamName = teamResult.rows[0]?.name;
+      if (!teamName) return res.status(404).json({ error: 'Team not found' });
+
+      const result = await pool.query(`
+        SELECT
+          p.player_name,
+          -- Split player_name into first/last for frontend compatibility
+          CASE WHEN POSITION(' ' IN p.player_name) > 0
+            THEN SUBSTRING(p.player_name FROM 1 FOR POSITION(' ' IN p.player_name) - 1)
+            ELSE p.player_name END as first_name,
+          CASE WHEN POSITION(' ' IN p.player_name) > 0
+            THEN SUBSTRING(p.player_name FROM POSITION(' ' IN p.player_name) + 1)
+            ELSE '' END as last_name,
+          p.player_id,
+          p.team_name,
+          $1 as team_id,
+          -- Pull metadata from players table when available
+          pl.position,
+          pl.year,
+          pl.height,
+          COALESCE((SELECT ps.uniform_number FROM exp_player_game_stats ps WHERE ps.player_id = p.player_id AND ps.team_name = $2 AND ps.season = $3 LIMIT 1), pl.uniform) as uniform,
+          COUNT(*) as gp,
+          SUM(p.pts) as pts,
+          ROUND(SUM(p.pts)::numeric / NULLIF(COUNT(*), 0), 1) as pts_pg,
+          SUM(p.reb) as reb,
+          ROUND(SUM(p.reb)::numeric / NULLIF(COUNT(*), 0), 1) as reb_pg,
+          SUM(p.ast) as ast,
+          ROUND(SUM(p.ast)::numeric / NULLIF(COUNT(*), 0), 1) as ast_pg,
+          SUM(p.stl) as stl,
+          ROUND(SUM(p.stl)::numeric / NULLIF(COUNT(*), 0), 1) as stl_pg,
+          SUM(p.blk) as blk,
+          ROUND(SUM(p.blk)::numeric / NULLIF(COUNT(*), 0), 1) as blk_pg,
+          SUM(p.turnovers) as turnovers,
+          SUM(p.fgm) as fgm, SUM(p.fga) as fga,
+          ROUND(SUM(p.fgm)::numeric / NULLIF(SUM(p.fga), 0) * 100, 1) as fg_pct,
+          SUM(p.fgm3) as fg3m, SUM(p.fga3) as fg3a,
+          ROUND(SUM(p.fgm3)::numeric / NULLIF(SUM(p.fga3), 0) * 100, 1) as fg3_pct,
+          SUM(p.ftm) as ftm, SUM(p.fta) as fta,
+          ROUND(SUM(p.ftm)::numeric / NULLIF(SUM(p.fta), 0) * 100, 1) as ft_pct,
+          SUM(p.oreb) as oreb, SUM(p.dreb) as dreb,
+          SUM(p.minutes) as min,
+          ROUND(SUM(p.minutes)::numeric / NULLIF(COUNT(*), 0), 1) as min_pg
+        FROM exp_player_game_stats p
+        JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
+        LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = $3
+        WHERE p.team_name = $2 AND p.season = $3 AND g.is_exhibition = false
+        GROUP BY p.player_name, p.player_id, p.team_name, pl.position, pl.year, pl.height, pl.uniform
+        ORDER BY SUM(p.pts)::numeric / NULLIF(COUNT(*), 0) DESC NULLS LAST
+      `, [teamId, teamName, season]);
+
+      res.json({ roster: result.rows });
+    } else {
+      const result = await pool.query(`
+        SELECT
+          p.*,
+          t.name as team_name,
+          t.conference
+        FROM players p
+        JOIN teams t ON p.team_id = t.team_id AND p.season = t.season
+        WHERE p.team_id = $1 AND p.season = $2
+        ORDER BY p.pts_pg DESC
+      `, [teamId, season]);
+
+      res.json({ roster: result.rows });
+    }
   } catch (err) {
     console.error('Error fetching team roster:', err);
     res.status(500).json({ error: 'Failed to fetch team roster' });

@@ -2,30 +2,57 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import './Bracketcast.css';
 import TeamLogo from './TeamLogo';
 import SkeletonLoader from './SkeletonLoader';
+import StatGroupTabs from './StatGroupTabs';
 import { API_URL } from '../utils/api';
 import { TOOLTIPS } from '../utils/tooltips';
 import { exportToCSV } from '../utils/csv';
 
-const COLUMNS = [
-  { key: 'rank', label: 'Rank' }, // Dynamic rank based on current sort
+// Fixed columns always shown at the start of the table
+const FIXED_COLUMNS = [
+  { key: 'rank', label: 'Rank' },
   { key: 'team', label: 'Team' },
   { key: 'area', label: 'Area', sortKey: 'area' },
-  { key: 'record', label: 'Record', sortKey: 'total_wins' },
-  { key: 'q1', label: 'Q1', sortKey: 'q1_wins' },
-  { key: 'q2', label: 'Q2', sortKey: 'q2_wins' },
-  { key: 'q3', label: 'Q3', sortKey: 'q3_wins' },
-  { key: 'q4', label: 'Q4', sortKey: 'q4_wins' },
-  { key: 'qwp', label: 'QWP', sortKey: 'qwp' },
-  { key: 'rpi_rank', label: 'RPI Rank', sortKey: 'rpi_rank' },
-  { key: 'rpi', label: 'RPI', sortKey: 'rpi' },
-  { key: 'pcr', label: 'PCR', sortKey: 'pcr' },
-  { key: 'pr', label: 'PR', sortKey: 'pr' },
-  { key: 'sos_rank', label: 'SOS Rank', sortKey: 'sos_rank' },
-  { key: 'sos', label: 'SOS', sortKey: 'sos' },
-  { key: 'total_win_pct', label: 'Total WP', sortKey: 'total_win_pct' },
-  { key: 'naia_win_pct', label: 'NAIA WP', sortKey: 'naia_win_pct' },
-  { key: 'owp', label: 'OWP', sortKey: 'owp' },
-  { key: 'oowp', label: 'OOWP', sortKey: 'oowp' },
+];
+
+// Stat group definitions for bracketcast
+const BRACKETCAST_STAT_GROUPS = {
+  'Primary Criteria': {
+    columns: [
+      { key: 'record', label: 'Record', sortKey: 'total_wins' },
+      { key: 'q1', label: 'Q1', sortKey: 'q1_wins' },
+      { key: 'q2', label: 'Q2', sortKey: 'q2_wins' },
+      { key: 'q3', label: 'Q3', sortKey: 'q3_wins' },
+      { key: 'q4', label: 'Q4', sortKey: 'q4_wins' },
+      { key: 'qwp', label: 'QWP', sortKey: 'qwp' },
+      { key: 'rpi_rank', label: 'RPI Rank', sortKey: 'rpi_rank' },
+      { key: 'rpi', label: 'RPI', sortKey: 'rpi' },
+      { key: 'pcr', label: 'PCR', sortKey: 'pcr' },
+      { key: 'pr', label: 'PR', sortKey: 'pr' },
+      { key: 'sos_rank', label: 'SOS Rank', sortKey: 'sos_rank' },
+      { key: 'sos', label: 'SOS', sortKey: 'sos' },
+      { key: 'total_win_pct', label: 'Total WP', sortKey: 'total_win_pct' },
+      { key: 'naia_win_pct', label: 'NAIA WP', sortKey: 'naia_win_pct' },
+      { key: 'owp', label: 'OWP', sortKey: 'owp' },
+      { key: 'oowp', label: 'OOWP', sortKey: 'oowp' },
+    ],
+    defaultSort: { key: 'pr', dir: 'asc' },
+  },
+  'RPI': {
+    columns: [
+      { key: 'rpi', label: 'RPI', sortKey: 'rpi' },
+      { key: 'sos', label: 'SOS', sortKey: 'sos' },
+      { key: 'naia_record', label: 'NAIA Record', sortKey: 'naia_wins' },
+      { key: 'naia_win_pct', label: 'Win %', sortKey: 'naia_win_pct' },
+      { key: 'owp', label: 'OWP', sortKey: 'owp' },
+      { key: 'oowp', label: 'OOWP', sortKey: 'oowp' },
+    ],
+    defaultSort: { key: 'rpi', dir: 'desc' },
+  },
+};
+
+const BRACKETCAST_TAB_GROUPS = [
+  { key: 'Primary Criteria', label: 'Primary Criteria' },
+  { key: 'RPI', label: 'RPI' },
 ];
 
 // Stats where lower values are better (for determining sort direction)
@@ -33,19 +60,24 @@ const LOWER_IS_BETTER = new Set([
   'rpi_rank', 'pcr', 'pr', 'sos_rank'
 ]);
 
-function Bracketcast({ league, season, onTeamClick }) {
+function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
   const [data, setData] = useState({ teams: [], bracket: {}, pods: [] });
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('table'); // 'table', 'bracket', or 'pods'
-  const [sort, setSort] = useState({ key: 'pr', dir: 'asc' });
+  const [sort, setSort] = useState(BRACKETCAST_STAT_GROUPS['Primary Criteria'].defaultSort);
   const [expandedTeams, setExpandedTeams] = useState(new Set()); // Track expanded teams in Seed Groups
   const [asOfDate, setAsOfDate] = useState(''); // User-selected cutoff date (empty = use all data)
+  const [activeStatGroup, setActiveStatGroup] = useState('Primary Criteria');
+
+  // Compute visible columns based on active stat group
+  const groupConfig = BRACKETCAST_STAT_GROUPS[activeStatGroup] || BRACKETCAST_STAT_GROUPS['Primary Criteria'];
+  const COLUMNS = useMemo(() => [...FIXED_COLUMNS, ...groupConfig.columns], [activeStatGroup]);
 
   useEffect(() => {
     const fetchBracketcast = async () => {
       setLoading(true);
       try {
-        let url = `${API_URL}/api/bracketcast?league=${league}&season=${season}`;
+        let url = `${API_URL}/api/bracketcast?league=${league}&season=${season}${sourceParam}`;
         if (asOfDate) {
           url += `&asOfDate=${asOfDate}`;
         }
@@ -60,7 +92,7 @@ function Bracketcast({ league, season, onTeamClick }) {
     };
 
     fetchBracketcast();
-  }, [league, season, asOfDate]);
+  }, [league, season, asOfDate, sourceParam]);
 
   const handleSort = (col) => {
     const sortKey = col.sortKey || col.key;
@@ -165,6 +197,14 @@ function Bracketcast({ league, season, onTeamClick }) {
     });
   };
 
+  const handleStatGroupChange = (group) => {
+    setActiveStatGroup(group);
+    const config = BRACKETCAST_STAT_GROUPS[group];
+    if (config?.defaultSort) {
+      setSort(config.defaultSort);
+    }
+  };
+
   // Format the as of date
   const formattedAsOfDate = useMemo(() => {
     if (!data.asOfDate) return null;
@@ -246,11 +286,12 @@ function Bracketcast({ league, season, onTeamClick }) {
           exportToCSV(
             sortedTeams.map((t, i) => ({ ...t, _rank: i + 1 })),
             csvCols,
-            'axis-bracketcast',
+            `axis-bracketcast-${activeStatGroup.toLowerCase().replace(/\s+/g, '-')}`,
             (row, colKey) => {
               if (colKey === '_rank') return row._rank;
               if (colKey === 'team') return row.name;
               if (colKey === 'record') return `${row.total_wins}-${row.total_losses}`;
+              if (colKey === 'naia_record') return `${row.naia_wins}-${row.naia_losses}`;
               if (colKey === 'q1') return `${row.q1_wins}-${row.q1_losses}`;
               if (colKey === 'q2') return `${row.q2_wins}-${row.q2_losses}`;
               if (colKey === 'q3') return `${row.q3_wins}-${row.q3_losses}`;
@@ -272,6 +313,12 @@ function Bracketcast({ league, season, onTeamClick }) {
       </div>
 
       {view === 'table' ? (
+        <>
+        <StatGroupTabs
+          active={activeStatGroup}
+          onChange={handleStatGroupChange}
+          groups={BRACKETCAST_TAB_GROUPS}
+        />
         <div className="bracketcast-table-wrapper">
           <div className="bracketcast-table-container">
             <table className="bracketcast-table">
@@ -295,83 +342,79 @@ function Bracketcast({ league, season, onTeamClick }) {
                     key={team.team_id}
                     className={team.pr && team.pr <= 64 ? 'in-bracket' : 'bubble'}
                   >
-                    <td className="col-rank">
-                      {index + 1}
-                    </td>
-                    <td className="col-team">
-                      <div className="team-info">
-                        <TeamLogo logoUrl={team.logo_url} teamName={team.name} />
-                        <div className="team-details">
-                          <span
-                            className="team-name team-name-clickable"
-                            onClick={() => onTeamClick && onTeamClick(team)}
-                          >
-                            {team.name}
-                            {team.is_conference_champion && <span className="champion-badge" title="Conference Champion (Auto-Bid)">🏆</span>}
-                          </span>
-                          <span className="team-conference">{team.conference || ''}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="col-area">
-                      <span className={`area-badge area-${team.area?.toLowerCase()}`}>
-                        {team.area}
-                      </span>
-                    </td>
-                    <td className="col-record">
-                      {team.total_wins}-{team.total_losses}
-                    </td>
-                    <td className={`col-quadrant ${getQuadrantClass(team.q1_wins, team.q1_losses, 1)}`}>
-                      {formatQuadrant(team.q1_wins, team.q1_losses)}
-                    </td>
-                    <td className={`col-quadrant ${getQuadrantClass(team.q2_wins, team.q2_losses, 2)}`}>
-                      {formatQuadrant(team.q2_wins, team.q2_losses)}
-                    </td>
-                    <td className={`col-quadrant ${getQuadrantClass(team.q3_wins, team.q3_losses, 3)}`}>
-                      {formatQuadrant(team.q3_wins, team.q3_losses)}
-                    </td>
-                    <td className={`col-quadrant ${getQuadrantClass(team.q4_wins, team.q4_losses, 4)}`}>
-                      {formatQuadrant(team.q4_wins, team.q4_losses)}
-                    </td>
-                    <td className="col-qwp">
-                      {team.qwp % 1 === 0 ? team.qwp.toFixed(0) : team.qwp.toFixed(1)}
-                    </td>
-                    <td className="col-rpi_rank">
-                      {team.rpi_rank || '-'}
-                    </td>
-                    <td className="col-rpi">
-                      {team.rpi ? team.rpi.toFixed(3) : '-'}
-                    </td>
-                    <td className="col-pcr">
-                      {team.pcr || '-'}
-                    </td>
-                    <td className="col-pr">
-                      {team.pr || '-'}
-                    </td>
-                    <td className="col-sos_rank">
-                      {team.sos_rank || '-'}
-                    </td>
-                    <td className="col-sos">
-                      {team.sos ? team.sos.toFixed(3) : '-'}
-                    </td>
-                    <td className="col-total_win_pct">
-                      {team.total_win_pct ? team.total_win_pct.toFixed(3) : '-'}
-                    </td>
-                    <td className="col-naia_win_pct">
-                      {team.naia_win_pct ? team.naia_win_pct.toFixed(3) : '-'}
-                    </td>
-                    <td className="col-owp">
-                      {team.owp ? team.owp.toFixed(3) : '-'}
-                    </td>
-                    <td className="col-oowp">
-                      {team.oowp ? team.oowp.toFixed(3) : '-'}
-                    </td>
+                    {COLUMNS.map((col) => {
+                      switch (col.key) {
+                        case 'rank':
+                          return <td key={col.key} className="col-rank">{index + 1}</td>;
+                        case 'team':
+                          return (
+                            <td key={col.key} className="col-team">
+                              <div className="team-info">
+                                <TeamLogo logoUrl={team.logo_url} teamName={team.name} />
+                                <div className="team-details">
+                                  <span
+                                    className="team-name team-name-clickable"
+                                    onClick={() => onTeamClick && onTeamClick(team)}
+                                  >
+                                    {team.name}
+                                    {team.is_conference_champion && <span className="champion-badge" title="Conference Champion (Auto-Bid)">🏆</span>}
+                                  </span>
+                                  <span className="team-conference">{team.conference || ''}</span>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        case 'area':
+                          return (
+                            <td key={col.key} className="col-area">
+                              <span className={`area-badge area-${team.area?.toLowerCase()}`}>{team.area}</span>
+                            </td>
+                          );
+                        case 'record':
+                          return <td key={col.key} className="col-record">{team.total_wins}-{team.total_losses}</td>;
+                        case 'q1':
+                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q1_wins, team.q1_losses, 1)}`}>{formatQuadrant(team.q1_wins, team.q1_losses)}</td>;
+                        case 'q2':
+                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q2_wins, team.q2_losses, 2)}`}>{formatQuadrant(team.q2_wins, team.q2_losses)}</td>;
+                        case 'q3':
+                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q3_wins, team.q3_losses, 3)}`}>{formatQuadrant(team.q3_wins, team.q3_losses)}</td>;
+                        case 'q4':
+                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q4_wins, team.q4_losses, 4)}`}>{formatQuadrant(team.q4_wins, team.q4_losses)}</td>;
+                        case 'qwp':
+                          return <td key={col.key} className="col-qwp">{team.qwp % 1 === 0 ? team.qwp.toFixed(0) : team.qwp.toFixed(1)}</td>;
+                        case 'naia_record':
+                          return <td key={col.key} className="col-naia_record">{team.naia_wins}-{team.naia_losses}</td>;
+                        case 'rpi':
+                          return <td key={col.key} className="col-rpi">{team.rpi ? team.rpi.toFixed(3) : '-'}</td>;
+                        case 'rpi_rank':
+                          return <td key={col.key} className="col-rpi_rank">{team.rpi_rank || '-'}</td>;
+                        case 'sos':
+                          return <td key={col.key} className="col-sos">{team.sos ? team.sos.toFixed(3) : '-'}</td>;
+                        case 'sos_rank':
+                          return <td key={col.key} className="col-sos_rank">{team.sos_rank || '-'}</td>;
+                        case 'pcr':
+                          return <td key={col.key} className="col-pcr">{team.pcr || '-'}</td>;
+                        case 'pr':
+                          return <td key={col.key} className="col-pr">{team.pr || '-'}</td>;
+                        case 'total_win_pct':
+                          return <td key={col.key} className="col-total_win_pct">{team.total_win_pct ? team.total_win_pct.toFixed(3) : '-'}</td>;
+                        case 'naia_win_pct':
+                          return <td key={col.key} className="col-naia_win_pct">{team.naia_win_pct ? team.naia_win_pct.toFixed(3) : '-'}</td>;
+                        case 'owp':
+                          return <td key={col.key} className="col-owp">{team.owp ? team.owp.toFixed(3) : '-'}</td>;
+                        case 'oowp':
+                          return <td key={col.key} className="col-oowp">{team.oowp ? team.oowp.toFixed(3) : '-'}</td>;
+                        default:
+                          return <td key={col.key}>-</td>;
+                      }
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+        </>
       ) : view === 'pods' ? (
         <div className="pods-projection">
           <p className="pods-description">

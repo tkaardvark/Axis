@@ -73,7 +73,7 @@ const formatWeekRange = (start, end) => {
   return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
 };
 
-function Conferences({ league, season, conferences = [], teams = [] }) {
+function Conferences({ league, season, conferences = [], teams = [], sourceParam = '' }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const rawConferenceParam = searchParams.get('conference');
@@ -126,7 +126,7 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
     const fetchRankings = async () => {
       setRankingsLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/conference-rankings?league=${league}&season=${season}`);
+        const res = await fetch(`${API_URL}/api/conference-rankings?league=${league}&season=${season}${sourceParam}`);
         const data = await res.json();
         setConfRankings(data);
       } catch (error) {
@@ -143,7 +143,7 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
     const fetchNetScatter = async () => {
       setNetScatterLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/conference-rpi-scatter?league=${league}&season=${season}`);
+        const res = await fetch(`${API_URL}/api/conference-rpi-scatter?league=${league}&season=${season}${sourceParam}`);
         const data = await res.json();
         setNetScatterData(data);
       } catch (error) {
@@ -168,9 +168,9 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
       setLoading(true);
       try {
         const [summaryRes, nationalRes, h2hRes] = await Promise.all([
-          fetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/summary?league=${league}&season=${season}`),
-          fetch(`${API_URL}/api/national-averages?league=${league}&season=${season}`),
-          fetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/head-to-head?league=${league}&season=${season}`),
+          fetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/summary?league=${league}&season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/national-averages?league=${league}&season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/head-to-head?league=${league}&season=${season}${sourceParam}`),
         ]);
         const summaryData = await summaryRes.json();
         const nationalData = await nationalRes.json();
@@ -196,7 +196,7 @@ function Conferences({ league, season, conferences = [], teams = [] }) {
       setScheduleLoading(true);
       try {
         const res = await fetch(
-          `${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/games?league=${league}&season=${season}`
+          `${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/games?league=${league}&season=${season}${sourceParam}`
         );
         const data = await res.json();
         // Only show conference matchups (both teams in the conference)

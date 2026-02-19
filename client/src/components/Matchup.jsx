@@ -39,7 +39,7 @@ const formatDate = (dateStr) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
 
-function Matchup({ league, season, teams = [], conferences = [] }) {
+function Matchup({ league, season, teams = [], conferences = [], sourceParam = '' }) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [team1Id, setTeam1Id] = useState(searchParams.get('team1') || '');
@@ -84,7 +84,7 @@ function Matchup({ league, season, teams = [], conferences = [] }) {
     const fetchMatchup = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/matchup?team1=${team1Id}&team2=${team2Id}&season=${season}&league=${league}`);
+        const res = await fetch(`${API_URL}/api/matchup?team1=${team1Id}&team2=${team2Id}&season=${season}&league=${league}${sourceParam}`);
         if (!res.ok) throw new Error('Failed to fetch');
         const json = await res.json();
         setData(json);

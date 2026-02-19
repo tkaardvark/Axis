@@ -158,6 +158,68 @@
   padding: 0;
 }
 
+/* Linescore */
+.boxscore-linescore {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-tertiary);
+}
+
+.linescore-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+
+.linescore-table th {
+  padding: 4px 8px;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.linescore-team-col {
+  text-align: left;
+  padding: 5px 8px;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.linescore-period-col {
+  text-align: center;
+  padding: 5px 10px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.linescore-total-col {
+  text-align: center;
+  padding: 5px 10px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--color-border-secondary);
+}
+
+.linescore-table thead .linescore-total-col {
+  border-left: 1px solid var(--color-border-secondary);
+}
+
+/* Center-spanning stat value (lead changes, ties, attendance) */
+.stat-center-value {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .boxscore-table {
   width: 100%;
   border-collapse: collapse;
@@ -262,4 +324,18 @@
     padding: 5px 10px;
     font-size: 12px;
   }
+
+  .boxscore-linescore {
+    padding: 10px 12px;
+  }
+
+  .linescore-team-col {
+    max-width: 100px;
+    font-size: 10px;
+  }
+
+  .linescore-period-col {
+    padding: 5px 6px;
+  }
+
 }

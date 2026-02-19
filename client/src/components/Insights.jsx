@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import './Insights.css';
+import './StatGroupTabs.css';
 import SkeletonLoader from './SkeletonLoader';
 import TrapezoidChart from './TrapezoidChart';
 import ChampionshipDNA from './ChampionshipDNA';
 import InsightScatterChart from './InsightScatterChart';
 
 // Tab configuration
-const TABS = [
+const BASE_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'shooting', label: 'Shooting' },
   { id: 'rebounding', label: 'Rebounding' },
@@ -14,16 +15,43 @@ const TABS = [
   { id: 'pace', label: 'Pace & Style' },
 ];
 
-function Insights({ teams, conferences = [], league, season, loading, onTeamClick, embedded = false }) {
+const GAME_FLOW_TAB = { id: 'gameflow', label: 'Game Flow' };
+
+function Insights({ teams, conferences = [], league, season, loading, onTeamClick, embedded = false, teamFilter = 'all' }) {
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Check if game flow data is available (boxscore source)
+  const hasGameFlow = useMemo(() => {
+    return teams && teams.length > 0 && teams[0].runs_scored_per_game != null;
+  }, [teams]);
+
+  const TABS = useMemo(() => {
+    return hasGameFlow ? [...BASE_TABS, GAME_FLOW_TAB] : BASE_TABS;
+  }, [hasGameFlow]);
 
   // Use all teams passed in (filtering is done by parent via FilterBar)
   const baseFilteredTeams = useMemo(() => {
     if (!teams || teams.length === 0) return [];
     
+    let filtered = [...teams];
+
+    if (teamFilter === 'net100' || teamFilter === 'net50') {
+      const limit = teamFilter === 'net100' ? 100 : 50;
+      filtered = filtered
+        .filter(t => t.adjusted_net_rating != null)
+        .sort((a, b) => (b.adjusted_net_rating || 0) - (a.adjusted_net_rating || 0))
+        .slice(0, limit);
+    } else if (teamFilter === 'rpi100' || teamFilter === 'rpi50') {
+      const limit = teamFilter === 'rpi100' ? 100 : 50;
+      filtered = filtered
+        .filter(t => t.rpi != null)
+        .sort((a, b) => (b.rpi || 0) - (a.rpi || 0))
+        .slice(0, limit);
+    }
+
     // Sort by adjusted_net_rating (best first)
-    return [...teams].sort((a, b) => (b.adjusted_net_rating || 0) - (a.adjusted_net_rating || 0));
-  }, [teams]);
+    return filtered.sort((a, b) => (b.adjusted_net_rating || 0) - (a.adjusted_net_rating || 0));
+  }, [teams, teamFilter]);
 
   // Filter teams with required stats for each visualization
   // Trapezoid of Excellence: limit to top 75 teams by RPI
@@ -60,6 +88,11 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
       .filter(t => t.pace != null && t.pts_paint_per_game != null && t.pts_fastbreak_per_game != null);
   }, [baseFilteredTeams]);
 
+  const gameFlowTeams = useMemo(() => {
+    return baseFilteredTeams
+      .filter(t => t.runs_scored_per_game != null && t.runs_allowed_per_game != null);
+  }, [baseFilteredTeams]);
+
   const leagueLabel = league === 'mens' ? "Men's" : "Women's";
 
   // Format functions for different stat types
@@ -85,11 +118,11 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
     <>
 
       {/* Tab Navigation */}
-      <div className="page-tabs">
+      <div className="stat-group-tabs">
           {TABS.map(tab => (
             <button
               key={tab.id}
-              className={`page-tab ${activeTab === tab.id ? 'active' : ''}`}
+              className={`stat-group-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
@@ -330,6 +363,109 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
               yLabel="3-Point Rate (%)"
               xFormat={ratingFormat}
               yFormat={pctFormat}
+              onTeamClick={onTeamClick}
+            />
+          </section>
+        </div>
+      )}
+
+      {/* Game Flow Tab */}
+      {activeTab === 'gameflow' && (
+        <div className="insights-tab-content">
+          <section className="insight-card">
+            <div className="insight-card-header">
+              <h2 className="insight-title">10-Point Runs: Scored vs Allowed</h2>
+              <p className="insight-description">
+                Unanswered 10+ point scoring runs per game — scored vs allowed. Top-right = frequently goes on runs while rarely allowing them.
+              </p>
+            </div>
+            <InsightScatterChart
+              teams={gameFlowTeams}
+              xKey="runs_scored_per_game"
+              yKey="runs_allowed_per_game"
+              xLabel="10-0 Runs Scored/G"
+              yLabel="10-0 Runs Allowed/G"
+              xFormat={ratingFormat}
+              yFormat={ratingFormat}
+              invertY={true}
+              onTeamClick={onTeamClick}
+            />
+          </section>
+
+          <section className="insight-card">
+            <div className="insight-card-header">
+              <h2 className="insight-title">Dominance: Avg Lead vs Opponent Lead</h2>
+              <p className="insight-description">
+                Average largest lead built vs average largest lead allowed. Top-right = dominant teams that rarely let opponents build big leads.
+              </p>
+            </div>
+            <InsightScatterChart
+              teams={gameFlowTeams}
+              xKey="avg_largest_lead"
+              yKey="avg_opp_largest_lead"
+              xLabel="Avg Largest Lead"
+              yLabel="Avg Opp Largest Lead"
+              xFormat={ratingFormat}
+              yFormat={ratingFormat}
+              invertY={true}
+              onTeamClick={onTeamClick}
+            />
+          </section>
+
+          <section className="insight-card">
+            <div className="insight-card-header">
+              <h2 className="insight-title">Closing Ability: Lead@Half vs Comeback Rate</h2>
+              <p className="insight-description">
+                Win % when leading at halftime vs win % when trailing at half. Top-right = closes out AND comes back.
+              </p>
+            </div>
+            <InsightScatterChart
+              teams={gameFlowTeams}
+              xKey="half_lead_win_pct"
+              yKey="comeback_win_pct"
+              xLabel="Lead at Half Win %"
+              yLabel="Comeback Win %"
+              xFormat={pctFormat}
+              yFormat={pctFormat}
+              onTeamClick={onTeamClick}
+            />
+          </section>
+
+          <section className="insight-card">
+            <div className="insight-card-header">
+              <h2 className="insight-title">Second Chance Battle</h2>
+              <p className="insight-description">
+                Second chance points scored vs allowed per game. Top-right = converts offensive rebounds while limiting opponent putbacks.
+              </p>
+            </div>
+            <InsightScatterChart
+              teams={gameFlowTeams}
+              xKey="second_chance_per_game"
+              yKey="opp_second_chance_per_game"
+              xLabel="2nd Chance Pts/G"
+              yLabel="Opp 2nd Chance Pts/G"
+              xFormat={ratingFormat}
+              yFormat={ratingFormat}
+              invertY={true}
+              onTeamClick={onTeamClick}
+            />
+          </section>
+
+          <section className="insight-card">
+            <div className="insight-card-header">
+              <h2 className="insight-title">Game Competitiveness</h2>
+              <p className="insight-description">
+                Lead changes vs ties per game — shows how tightly-contested a team's games typically are.
+              </p>
+            </div>
+            <InsightScatterChart
+              teams={gameFlowTeams}
+              xKey="lead_changes_per_game"
+              yKey="ties_per_game"
+              xLabel="Lead Changes/G"
+              yLabel="Ties/G"
+              xFormat={ratingFormat}
+              yFormat={ratingFormat}
               onTeamClick={onTeamClick}
             />
           </section>

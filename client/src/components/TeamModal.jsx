@@ -78,7 +78,7 @@ const STAT_GROUPS = {
   },
 };
 
-function TeamModal({ team, season = '2025-26', onClose }) {
+function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const focusTrapRef = useFocusTrap();
@@ -103,8 +103,8 @@ function TeamModal({ team, season = '2025-26', onClose }) {
       setLoading(true);
       try {
         const [splitsRes, scheduleRes] = await Promise.all([
-          fetch(`${API_URL}/api/teams/${team.team_id}/splits?season=${season}`),
-          fetch(`${API_URL}/api/teams/${team.team_id}/schedule?season=${season}`)
+          fetch(`${API_URL}/api/teams/${team.team_id}/splits?season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/teams/${team.team_id}/schedule?season=${season}${sourceParam}`)
         ]);
         const splitsData = await splitsRes.json();
         const scheduleData = await scheduleRes.json();

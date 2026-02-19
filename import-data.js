@@ -16,6 +16,10 @@ require('dotenv').config();
 const { Client } = require('pg');
 const https = require('https');
 const fs = require('fs');
+const { exhibitionOverrides } = require('./config/exhibition-overrides');
+
+// Build a Set of game IDs that should be forced to exhibition
+const EXHIBITION_OVERRIDE_IDS = new Set(exhibitionOverrides.map(o => o.gameId));
 
 // Parse --season argument (default: 2025-26)
 const args = process.argv.slice(2);
@@ -464,6 +468,14 @@ async function processTeamUrl(client, url, league) {
     
     // Extract and save games
     const games = extractGames(json, teamData.team_id);
+
+    // Apply manual exhibition overrides
+    for (const game of games) {
+      if (EXHIBITION_OVERRIDE_IDS.has(game.game_id)) {
+        game.is_exhibition = true;
+      }
+    }
+
     const gameStats = await upsertGames(client, games);
     
     return {

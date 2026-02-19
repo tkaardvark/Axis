@@ -24,7 +24,7 @@ const formatDateForDisplay = (date) => {
   });
 };
 
-function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick }) {
+function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick, sourceParam = '' }) {
   const focusTrapRef = useFocusTrap();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -42,7 +42,7 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick 
       setLoading(true);
       try {
         const response = await fetch(
-          `${API_URL}/api/teams?league=${league}&season=${season}&conference=${encodeURIComponent(conferenceName)}`
+          `${API_URL}/api/teams?league=${league}&season=${season}&conference=${encodeURIComponent(conferenceName)}${sourceParam}`
         );
         const data = await response.json();
         setTeams(Array.isArray(data) ? data : []);
@@ -66,7 +66,7 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick 
       try {
         const dateStr = formatDateForAPI(selectedDate);
         const response = await fetch(
-          `${API_URL}/api/conferences/${encodeURIComponent(conferenceName)}/games?league=${league}&season=${season}&date=${dateStr}`
+          `${API_URL}/api/conferences/${encodeURIComponent(conferenceName)}/games?league=${league}&season=${season}&date=${dateStr}${sourceParam}`
         );
         const data = await response.json();
         setGames(data.games || []);

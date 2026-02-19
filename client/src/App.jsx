@@ -29,7 +29,11 @@ const DEFAULTS = {
   seasonSegment: 'all',
   statGroup: 'Efficiency',
   view: 'table',
+  source: 'auto',
 };
+
+// Seasons + leagues with boxscore data available (mirrors backend BOXSCORE_AVAILABLE)
+const BOXSCORE_AVAILABLE = new Set(['mens:2025-26']);
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,8 +46,18 @@ function App() {
   const conference = searchParams.get('conference') || DEFAULTS.conference;
   const opponent = searchParams.get('opponent') || DEFAULTS.opponent;
   const seasonSegment = searchParams.get('seasonSegment') || DEFAULTS.seasonSegment;
+  const vizFilter = searchParams.get('vizFilter') || 'all';
   const statGroup = searchParams.get('statGroup') || DEFAULTS.statGroup;
   const view = searchParams.get('view') || DEFAULTS.view;
+  const source = searchParams.get('source') || DEFAULTS.source;
+
+  // Resolve effective source: 'auto' lets server decide, 'legacy' forces legacy
+  const effectiveSource = source === 'legacy' ? 'legacy'
+    : source === 'boxscore' ? 'boxscore'
+    : BOXSCORE_AVAILABLE.has(`${league}:${season}`) ? 'boxscore' : 'legacy';
+
+  // Only send explicit source param when overriding (legacy forces legacy, auto lets server decide)
+  const sourceParam = source === 'legacy' ? '&source=legacy' : '';
 
   const [teams, setTeams] = useState([]);
   const [conferences, setConferences] = useState([]);
@@ -80,6 +94,7 @@ function App() {
   const setSeason = useCallback((value) => updateParams({ season: value }), [updateParams]);
   const setStatGroup = useCallback((value) => updateParams({ statGroup: value }), [updateParams]);
   const setView = useCallback((value) => updateParams({ view: value }), [updateParams]);
+  const setSource = useCallback((value) => updateParams({ source: value }), [updateParams]);
 
   const setFilters = useCallback((updater) => {
     if (typeof updater === 'function') {
@@ -92,7 +107,7 @@ function App() {
   }, [conference, opponent, seasonSegment, updateParams]);
 
   // Derive filters object from URL params
-  const filters = { conference, opponent, seasonSegment };
+  const filters = { conference, opponent, seasonSegment, vizFilter };
 
   // Determine current page from pathname
   const getCurrentPage = () => {
@@ -157,7 +172,7 @@ function App() {
         'national': 'National Tournament'
       };
 
-      let url = `${API_URL}/api/teams?league=${league}&season=${season}`;
+      let url = `${API_URL}/api/teams?league=${league}&season=${season}${sourceParam}`;
 
       if (conference !== 'All Conferences') {
         url += `&conference=${encodeURIComponent(conference)}`;
@@ -183,7 +198,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [league, season, conference, opponent, seasonSegment]);
+  }, [league, season, conference, opponent, seasonSegment, sourceParam]);
 
   // Fetch teams when relevant params change
   useEffect(() => {
@@ -252,6 +267,7 @@ function App() {
       conference: DEFAULTS.conference,
       opponent: DEFAULTS.opponent,
       seasonSegment: DEFAULTS.seasonSegment,
+      vizFilter: 'all',
     });
   };
 
@@ -271,6 +287,7 @@ function App() {
         filters={filters}
         onFilterChange={handleFilterChange}
         onReset={handleFilterReset}
+        view={view}
       />
       {view === 'table' ? (
         <>
@@ -298,6 +315,7 @@ function App() {
           season={season}
           onTeamClick={handleTeamClick}
           embedded={true}
+          teamFilter={vizFilter}
         />
       )}
     </>
@@ -316,6 +334,9 @@ function App() {
         activePage={currentPage}
         onPageChange={setCurrentPage}
         hasPlayers={hasPlayers}
+        source={source}
+        effectiveSource={effectiveSource}
+        onSourceChange={setSource}
       />
       <main id="main-content" className="main-content">
         {error && (
@@ -337,6 +358,7 @@ function App() {
                   season={season}
                   conferences={conferences}
                   teams={teams}
+                  sourceParam={sourceParam}
                 />
               }
             />
@@ -347,6 +369,7 @@ function App() {
                   league={league}
                   season={season}
                   onTeamClick={handleTeamClick}
+                  sourceParam={sourceParam}
                 />
               }
             />
@@ -358,6 +381,7 @@ function App() {
                   season={season}
                   teams={teams}
                   conferences={conferences}
+                  sourceParam={sourceParam}
                 />
               }
             />
@@ -368,6 +392,7 @@ function App() {
                   league={league}
                   season={season}
                   conferences={conferences}
+                  sourceParam={sourceParam}
                 />
               }
             />
@@ -392,6 +417,7 @@ function App() {
           onClose={handleCloseModal}
           league={league}
           season={season}
+          sourceParam={sourceParam}
         />
       )}
       {selectedConference && (
@@ -401,6 +427,7 @@ function App() {
           season={season}
           onClose={handleCloseConferenceModal}
           onTeamClick={handleTeamClick}
+          sourceParam={sourceParam}
         />
       )}
     </div>

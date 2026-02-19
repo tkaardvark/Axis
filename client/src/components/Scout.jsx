@@ -83,7 +83,7 @@ const STAT_GROUPS = {
   },
 };
 
-function Scout({ league, season, teams = [], conferences = [] }) {
+function Scout({ league, season, teams = [], conferences = [], sourceParam = '' }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const teamIdFromUrl = searchParams.get('team');
@@ -164,10 +164,10 @@ function Scout({ league, season, teams = [], conferences = [] }) {
       setLoading(true);
       try {
         const [splitsRes, scheduleRes, percentilesRes, rosterRes] = await Promise.all([
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/splits?season=${season}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/schedule?season=${season}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/percentiles?season=${season}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/roster?season=${season}`)
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/splits?season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/schedule?season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/percentiles?season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/roster?season=${season}${sourceParam}`)
         ]);
         const splitsData = await splitsRes.json();
         const scheduleData = await scheduleRes.json();
@@ -397,6 +397,7 @@ function Scout({ league, season, teams = [], conferences = [] }) {
           season={season}
           teams={teams}
           conferences={conferences}
+          sourceParam={sourceParam}
         />
       ) : (
       <>
@@ -802,6 +803,7 @@ function Scout({ league, season, teams = [], conferences = [] }) {
         <BoxScoreModal
           gameId={boxScoreGameId}
           season={season}
+          sourceParam={sourceParam}
           onClose={() => setBoxScoreGameId(null)}
         />
       )}

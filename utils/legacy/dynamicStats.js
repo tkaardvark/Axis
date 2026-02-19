@@ -1,4 +1,4 @@
-const { DEFAULT_SEASON } = require('../db/pool');
+const { DEFAULT_SEASON } = require('../../db/pool');
 
 /**
  * Calculate team stats dynamically from games table based on filters

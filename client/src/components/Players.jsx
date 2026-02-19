@@ -96,7 +96,7 @@ const POSITION_OPTIONS = [
   { value: 'C', label: 'Center' },
 ];
 
-function Players({ league, season, conferences }) {
+function Players({ league, season, conferences, sourceParam = '' }) {
   const [players, setPlayers] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -120,7 +120,7 @@ function Players({ league, season, conferences }) {
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-        const url = `${API_URL}/api/teams?league=${league}&season=${season}`;
+        const url = `${API_URL}/api/teams?league=${league}&season=${season}${sourceParam}`;
         const response = await fetch(url);
         const data = await response.json();
         // Sort teams alphabetically by name
@@ -146,7 +146,7 @@ function Players({ league, season, conferences }) {
   const fetchPlayers = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `${API_URL}/api/players?league=${league}&season=${season}`;
+      let url = `${API_URL}/api/players?league=${league}&season=${season}${sourceParam}`;
       url += `&sort_by=${sort.key}&sort_order=${sort.dir}`;
       url += `&limit=${pageSize}&offset=${page * pageSize}`;
       url += `&min_gp=${filters.minGp}`;
@@ -175,7 +175,7 @@ function Players({ league, season, conferences }) {
     } finally {
       setLoading(false);
     }
-  }, [league, season, sort, page, filters]);
+  }, [league, season, sort, page, filters, sourceParam]);
 
   useEffect(() => {
     fetchPlayers();
@@ -186,7 +186,7 @@ function Players({ league, season, conferences }) {
     setVizLoading(true);
     try {
       // Fetch all players for visualizations (no limit)
-      const url = `${API_URL}/api/players?league=${league}&season=${season}&sort_by=pts_pg&sort_order=DESC&limit=10000&min_gp=0`;
+      const url = `${API_URL}/api/players?league=${league}&season=${season}${sourceParam}&sort_by=pts_pg&sort_order=DESC&limit=10000&min_gp=0`;
       const response = await fetch(url);
       const data = await response.json();
       setAllPlayers(data.players || []);
@@ -196,7 +196,7 @@ function Players({ league, season, conferences }) {
     } finally {
       setVizLoading(false);
     }
-  }, [league, season]);
+  }, [league, season, sourceParam]);
 
   // Fetch all players when switching to visualizations view
   useEffect(() => {

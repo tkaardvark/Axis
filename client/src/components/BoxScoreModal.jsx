@@ -1,11 +1,67 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './BoxScoreModal.css';
 import TeamLogo from './TeamLogo';
+import ScoreChart from './ScoreChart';
 import { API_URL } from '../utils/api';
 import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
 
-function BoxScoreModal({ gameId, season, onClose }) {
+/**
+ * Compute game flow stats from score_progression:
+ *  - largest lead for each team
+ *  - largest scoring run for each team
+ */
+function computeGameFlow(scoreProgression) {
+  if (!scoreProgression || scoreProgression.length < 2) return null;
+
+  let awayLargestLead = 0;
+  let homeLargestLead = 0;
+
+  // For largest run: track consecutive unanswered points
+  let awayLargestRun = 0;
+  let homeLargestRun = 0;
+  let currentRunTeam = null; // 'away' | 'home'
+  let currentRunPts = 0;
+
+  let prevAway = 0;
+  let prevHome = 0;
+
+  for (const p of scoreProgression) {
+    const diff = p.awayScore - p.homeScore;
+    if (diff > 0 && diff > awayLargestLead) awayLargestLead = diff;
+    if (diff < 0 && -diff > homeLargestLead) homeLargestLead = -diff;
+
+    // Determine who scored
+    const awayScored = p.awayScore - prevAway;
+    const homeScored = p.homeScore - prevHome;
+
+    if (awayScored > 0) {
+      if (currentRunTeam === 'away') {
+        currentRunPts += awayScored;
+      } else {
+        currentRunTeam = 'away';
+        currentRunPts = awayScored;
+      }
+      if (currentRunPts > awayLargestRun) awayLargestRun = currentRunPts;
+    }
+    if (homeScored > 0) {
+      if (currentRunTeam === 'home') {
+        currentRunPts += homeScored;
+      } else {
+        currentRunTeam = 'home';
+        currentRunPts = homeScored;
+      }
+      if (currentRunPts > homeLargestRun) homeLargestRun = currentRunPts;
+    }
+
+    prevAway = p.awayScore;
+    prevHome = p.homeScore;
+  }
+
+  return { awayLargestLead, homeLargestLead, awayLargestRun, homeLargestRun };
+}
+
+function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
   const focusTrapRef = useFocusTrap();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,7 +72,7 @@ function BoxScoreModal({ gameId, season, onClose }) {
     const fetchBoxScore = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/games/${gameId}/boxscore?season=${season}`);
+        const res = await fetch(`${API_URL}/api/games/${gameId}/boxscore?season=${season}${sourceParam}`);
         if (!res.ok) throw new Error('Failed to fetch');
         const json = await res.json();
         setData(json);
@@ -28,7 +84,7 @@ function BoxScoreModal({ gameId, season, onClose }) {
     };
 
     fetchBoxScore();
-  }, [gameId, season]);
+  }, [gameId, season, sourceParam]);
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -51,6 +107,11 @@ function BoxScoreModal({ gameId, season, onClose }) {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   };
+
+  const gameFlow = useMemo(() => {
+    if (!data?.score_progression) return null;
+    return computeGameFlow(data.score_progression);
+  }, [data]);
 
   if (!gameId) return null;
 
@@ -92,6 +153,49 @@ function BoxScoreModal({ gameId, season, onClose }) {
                 <div className="boxscore-team-name">{data.opponent.name}</div>
               </div>
             </div>
+
+            {data.score_progression && data.score_progression.length > 1 && (
+              <ScoreChart
+                scoreProgression={data.score_progression}
+                awayName={data.team.name}
+                homeName={data.opponent.name}
+              />
+            )}
+
+            {/* Linescore */}
+            {data.period_scores && (
+              <div className="boxscore-linescore">
+                <table className="linescore-table">
+                  <thead>
+                    <tr>
+                      <th className="linescore-team-col"></th>
+                      {(data.period_scores.away || []).map((_, i) => (
+                        <th key={i} className="linescore-period-col">
+                          {i < 2 ? `${i + 1}H` : `OT${i - 1}`}
+                        </th>
+                      ))}
+                      <th className="linescore-total-col">T</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="linescore-team-col">{data.team.name}</td>
+                      {(data.period_scores.away || []).map((s, i) => (
+                        <td key={i} className="linescore-period-col">{s}</td>
+                      ))}
+                      <td className="linescore-total-col">{data.team.score}</td>
+                    </tr>
+                    <tr>
+                      <td className="linescore-team-col">{data.opponent.name}</td>
+                      {(data.period_scores.home || []).map((s, i) => (
+                        <td key={i} className="linescore-period-col">{s}</td>
+                      ))}
+                      <td className="linescore-total-col">{data.opponent.score}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="boxscore-body">
               <table className="boxscore-table">
@@ -136,6 +240,27 @@ function BoxScoreModal({ gameId, season, onClose }) {
                       <StatRow label="Pts Off TO" team={data.team.stats.pts_turnovers} opp={data.opponent.stats.pts_turnovers} higherBetter />
                     </>
                   )}
+
+                  {(data.lead_changes != null || gameFlow) && (
+                    <>
+                      <tr className="boxscore-section-header"><td colSpan="3">Game Flow</td></tr>
+                      {data.lead_changes != null && (
+                        <CenterRow label="Lead Changes" value={data.lead_changes} />
+                      )}
+                      {data.ties != null && (
+                        <CenterRow label="Times Tied" value={data.ties} />
+                      )}
+                      {gameFlow && (
+                        <StatRow label="Largest Lead" team={gameFlow.awayLargestLead || '-'} opp={gameFlow.homeLargestLead || '-'} higherBetter />
+                      )}
+                      {gameFlow && (
+                        <StatRow label="Largest Run" team={gameFlow.awayLargestRun > 0 ? `${gameFlow.awayLargestRun}-0` : '-'} opp={gameFlow.homeLargestRun > 0 ? `${gameFlow.homeLargestRun}-0` : '-'} />
+                      )}
+                      {data.attendance != null && data.attendance > 0 && (
+                        <CenterRow label="Attendance" value={data.attendance.toLocaleString()} />
+                      )}
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -143,6 +268,15 @@ function BoxScoreModal({ gameId, season, onClose }) {
         )}
       </div>
     </div>
+  );
+}
+
+function CenterRow({ label, value }) {
+  return (
+    <tr>
+      <td className="stat-label-col">{label}</td>
+      <td className="stat-value-col stat-center-value" colSpan="2">{value}</td>
+    </tr>
   );
 }
 

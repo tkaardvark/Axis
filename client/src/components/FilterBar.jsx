@@ -1,6 +1,6 @@
 import './FilterBar.css';
 
-function FilterBar({ conferences, months, filters, onFilterChange, onReset }) {
+function FilterBar({ conferences, months, filters, onFilterChange, onReset, view }) {
   return (
     <div className="filter-bar">
       <div className="filter-group">
@@ -52,6 +52,22 @@ function FilterBar({ conferences, months, filters, onFilterChange, onReset }) {
           )}
         </select>
       </div>
+
+      {view === 'visualizations' && (
+        <div className="filter-group">
+          <label>Teams Shown</label>
+          <select
+            value={filters.vizFilter || 'all'}
+            onChange={(e) => onFilterChange('vizFilter', e.target.value)}
+          >
+            <option value="all">All Teams</option>
+            <option value="net100">Top 100 — Adj. Net Rtg</option>
+            <option value="net50">Top 50 — Adj. Net Rtg</option>
+            <option value="rpi100">Top 100 — RPI</option>
+            <option value="rpi50">Top 50 — RPI</option>
+          </select>
+        </div>
+      )}
 
       <div className="filter-actions">
         <button className="reset-btn" onClick={onReset}>

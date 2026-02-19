@@ -3,7 +3,7 @@ import logoSrc from '../assets/logo.svg';
 import logoDarkSrc from '../assets/logo-dark.svg';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 
-function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange, lastUpdated, hasPlayers }) {
+function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange, lastUpdated, hasPlayers, source, effectiveSource, onSourceChange }) {
   const { theme, toggleTheme } = useTheme();
 
   const formatLastUpdated = (dateStr) => {
@@ -40,6 +40,23 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
         </div>
 
         <div className="header-right">
+          {onSourceChange && (
+            <button
+              className={`source-toggle${source === 'legacy' ? ' legacy' : ' active'}`}
+              onClick={() => onSourceChange(source === 'legacy' ? 'auto' : 'legacy')}
+              aria-label={source === 'legacy' ? 'Switch back to auto data source' : 'Force legacy data source'}
+              title={effectiveSource === 'boxscore' ? 'Using Box Score data (click for legacy)' : 'Using Legacy data'}
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
+                <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="2"/>
+                <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" strokeWidth="2"/>
+                <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" strokeWidth="2"/>
+                <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              <span className="source-toggle-label">{effectiveSource === 'boxscore' ? 'Box Score' : 'Legacy'}</span>
+            </button>
+          )}
           <button
             className="theme-toggle"
             onClick={toggleTheme}

@@ -115,6 +115,21 @@ async function playersJob() {
   await runScript('import-players.js', ['--season', SEASON, '--league', 'mens']);
 }
 
+/**
+ * Box score refresh: import yesterday's completed games from Presto Sports.
+ * This is the primary data source for MBB 2025-26 — runs nightly after games finish.
+ * Uses the experimental box score pipeline to fetch individual game box scores.
+ */
+async function boxScoreRefreshJob() {
+  await runScript('experimental/import-box-scores.js', [
+    '--yesterday',
+    '--season', SEASON,
+    '--league', 'mens',
+    '--concurrency', '5',
+    '--delay', '300',
+  ]);
+}
+
 // ─── Schedule Registration ──────────────────────────────────────────────────
 
 function startScheduler() {
@@ -137,10 +152,17 @@ function startScheduler() {
     timezone: tz,
   });
 
+  // ④ 4:00 AM ET — box score refresh (import yesterday's games)
+  //    Primary data source for MBB 2025-26 team/player stats
+  cron.schedule('0 4 * * *', () => runJob('boxscore-refresh', boxScoreRefreshJob), {
+    timezone: tz,
+  });
+
   log('Scheduler initialized');
   log('  • Scrape team URLs & conferences — daily at 12:00 AM ET');
   log('  • Refresh games & analytics      — every 4 hours (2,6,10,14,18,22 ET)');
   log('  • Import player stats            — daily at 3:00 AM ET');
+  log('  • Box score refresh (yesterday)  — daily at 4:00 AM ET');
 }
 
 module.exports = { startScheduler };
