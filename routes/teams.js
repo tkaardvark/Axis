@@ -34,14 +34,14 @@ router.get('/api/teams', async (req, res) => {
           SELECT t.team_id,
             e.away_score as team_score, e.home_score as opponent_score
           FROM exp_game_box_scores e
-          JOIN teams t ON t.name = e.away_team_name AND t.season = e.season
+          JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
           UNION ALL
           SELECT t.team_id,
             e.home_score as team_score, e.away_score as opponent_score
           FROM exp_game_box_scores e
-          JOIN teams t ON t.name = e.home_team_name AND t.season = e.season
+          JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
         )
@@ -108,15 +108,41 @@ router.get('/api/teams', async (req, res) => {
         });
 
         // Get all completed NAIA games for quadrant calculation
-        const gamesResult = await pool.query(`
-          SELECT g.team_id, g.opponent_id, g.location, g.team_score, g.opponent_score
-          FROM games g
-          JOIN teams t ON g.team_id = t.team_id
-          WHERE t.league = $1
-            AND g.season = $2
-            AND g.is_naia_game = TRUE
-            AND g.is_completed = TRUE
-        `, [league, season]);
+        let gamesResult;
+        if (useBoxScore) {
+          gamesResult = await pool.query(`
+            SELECT team_id, opponent_id, location, team_score, opponent_score
+            FROM (
+              SELECT t.team_id, e.home_team_id as opponent_id,
+                CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location,
+                e.away_score as team_score, e.home_score as opponent_score
+              FROM exp_game_box_scores e
+              JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+              WHERE t.league = $1 AND e.season = $2
+                AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
+                AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+              UNION ALL
+              SELECT t.team_id, e.away_team_id as opponent_id,
+                CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location,
+                e.home_score as team_score, e.away_score as opponent_score
+              FROM exp_game_box_scores e
+              JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+              WHERE t.league = $1 AND e.season = $2
+                AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
+                AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            ) flat
+          `, [league, season]);
+        } else {
+          gamesResult = await pool.query(`
+            SELECT g.team_id, g.opponent_id, g.location, g.team_score, g.opponent_score
+            FROM games g
+            JOIN teams t ON g.team_id = t.team_id
+            WHERE t.league = $1
+              AND g.season = $2
+              AND g.is_naia_game = TRUE
+              AND g.is_completed = TRUE
+          `, [league, season]);
+        }
 
         // Tally quadrant records per team
         const quadrantRecords = {};
@@ -198,14 +224,14 @@ router.get('/api/teams', async (req, res) => {
             SELECT t.team_id,
               e.away_score as team_score, e.home_score as opponent_score
             FROM exp_game_box_scores e
-            JOIN teams t ON t.name = e.away_team_name AND t.season = e.season
+            JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
             WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
               AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
             UNION ALL
             SELECT t.team_id,
               e.home_score as team_score, e.away_score as opponent_score
             FROM exp_game_box_scores e
-            JOIN teams t ON t.name = e.home_team_name AND t.season = e.season
+            JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
             WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
               AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
           )
@@ -260,7 +286,47 @@ router.get('/api/teams', async (req, res) => {
       });
 
       // Get all conference games (completed and future)
-      const allConfGames = await pool.query(`
+      let allConfGames;
+      if (useBoxScore) {
+        const completedConf = await pool.query(`
+          SELECT team_id, opponent_id, team_score, opponent_score,
+                 true as is_completed, location
+          FROM (
+            SELECT e.away_team_id as team_id, e.home_team_id as opponent_id,
+              e.away_score as team_score, e.home_score as opponent_score,
+              CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location
+            FROM exp_game_box_scores e
+            JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+            WHERE e.season = $2 AND e.is_conference = true
+              AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
+              AND t.league = $1 AND t.is_excluded = false
+              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            UNION ALL
+            SELECT e.home_team_id as team_id, e.away_team_id as opponent_id,
+              e.home_score as team_score, e.away_score as opponent_score,
+              CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location
+            FROM exp_game_box_scores e
+            JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+            WHERE e.season = $2 AND e.is_conference = true
+              AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
+              AND t.league = $1 AND t.is_excluded = false
+              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+          ) sub
+        `, [league, season]);
+
+        const futureConf = await pool.query(`
+          SELECT f.team_id, f.opponent_id, NULL as team_score, NULL as opponent_score,
+                 false as is_completed, f.location
+          FROM future_games f
+          JOIN teams t ON f.team_id = t.team_id AND t.season = $2
+          WHERE f.season = $2 AND f.is_conference = true
+            AND f.is_naia_game = true AND f.is_exhibition = false
+            AND t.league = $1 AND t.is_excluded = false
+        `, [league, season]);
+
+        allConfGames = { rows: [...completedConf.rows, ...futureConf.rows] };
+      } else {
+        allConfGames = await pool.query(`
         SELECT g.team_id, g.opponent_id, g.team_score, g.opponent_score,
                g.is_completed, g.location
         FROM games g
@@ -268,6 +334,7 @@ router.get('/api/teams', async (req, res) => {
         WHERE g.season = $2 AND g.is_conference = TRUE AND g.is_naia_game = TRUE
           AND g.is_exhibition = FALSE AND t.league = $1 AND t.is_excluded = FALSE
       `, [league, season]);
+      }
 
       const projRecords = {};
       allConfGames.rows.forEach(g => {
@@ -354,7 +421,7 @@ router.get('/api/teams/:teamId', async (req, res) => {
 
     let games;
     if (useBoxScore) {
-      games = await getBoxScoreGamesForTeam(pool, teamId, season);
+      games = await getBoxScoreGamesForTeam(pool, teamId, season, league);
     } else {
       const gamesResult = await pool.query(
         `SELECT g.*,
@@ -492,13 +559,13 @@ router.get('/api/teams/:teamId/splits', async (req, res) => {
     // Get all completed games for this team (exclude future games)
     let allGames;
     if (useBoxScore) {
-      const boxGames = await getBoxScoreGamesForTeam(pool, teamId, season);
+      const boxGames = await getBoxScoreGamesForTeam(pool, teamId, season, league);
       allGames = boxGames.filter(g => !g.is_exhibition);
     } else {
       const gamesResult = await pool.query(
         `SELECT g.*
          FROM games g
-         WHERE g.team_id = $1 AND g.season = $2 AND g.is_naia_game = true AND g.is_completed = true
+         WHERE g.team_id = $1 AND g.season = $2 AND g.is_naia_game = true AND g.is_completed = true AND g.is_exhibition = false
          ORDER BY g.game_date DESC`,
         [teamId, season]
       );
@@ -713,32 +780,32 @@ router.get('/api/teams/:teamId/schedule', async (req, res) => {
 
     let rawGames;
     if (useBoxScore) {
-      rawGames = await getBoxScoreGamesForTeam(pool, teamId, season);
+      rawGames = await getBoxScoreGamesForTeam(pool, teamId, season, teamLeague);
 
-      // Box score source only has completed games — fetch future games from the games table
+      // Box score source only has completed games — fetch future games from future_games table
       const futureResult = await pool.query(
         `SELECT
-          g.game_id,
-          g.game_date,
-          g.location,
-          g.opponent_name,
-          g.opponent_id,
-          g.team_score,
-          g.opponent_score,
-          g.is_conference,
-          g.is_naia_game,
-          g.is_exhibition,
-          g.is_postseason,
-          g.is_national_tournament,
-          g.is_completed,
-          g.fga, g.oreb, g.turnovers, g.fta,
-          g.opp_fga, g.opp_oreb, g.opp_turnovers, g.opp_fta,
+          f.id as game_id,
+          f.game_date,
+          f.location,
+          f.opponent_name,
+          f.opponent_id,
+          NULL as team_score,
+          NULL as opponent_score,
+          f.is_conference,
+          f.is_naia_game,
+          f.is_exhibition,
+          f.is_postseason,
+          false as is_national_tournament,
+          false as is_completed,
+          NULL as fga, NULL as oreb, NULL as turnovers, NULL as fta,
+          NULL as opp_fga, NULL as opp_oreb, NULL as opp_turnovers, NULL as opp_fta,
           t.name as opponent_team_name,
           t.logo_url as opponent_logo_url
-         FROM games g
-         LEFT JOIN teams t ON g.opponent_id = t.team_id AND t.season = $2
-         WHERE g.team_id = $1 AND g.season = $2 AND g.is_completed = FALSE
-         ORDER BY g.game_date ASC`,
+         FROM future_games f
+         LEFT JOIN teams t ON f.opponent_id = t.team_id AND t.season = $2
+         WHERE f.team_id = $1 AND f.season = $2
+         ORDER BY f.game_date ASC`,
         [teamId, season]
       );
       rawGames = [...rawGames, ...futureResult.rows];
@@ -935,10 +1002,10 @@ router.get('/api/teams/:teamId/roster', async (req, res) => {
         FROM exp_player_game_stats p
         JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
         LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = $3
-        WHERE p.team_name = $2 AND p.season = $3 AND g.is_exhibition = false
+        WHERE p.team_name = $2 AND p.season = $3 AND g.is_exhibition = false AND g.league = $4
         GROUP BY p.player_name, p.player_id, p.team_name, pl.position, pl.year, pl.height, pl.uniform
         ORDER BY SUM(p.pts)::numeric / NULLIF(COUNT(*), 0) DESC NULLS LAST
-      `, [teamId, teamName, season]);
+      `, [teamId, teamName, season, league]);
 
       res.json({ roster: result.rows });
     } else {

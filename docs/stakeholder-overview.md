@@ -23,7 +23,7 @@ The main page with a sortable table of every NAIA team. Statistics are grouped i
 
 You can filter by conference, opponent type (conference games only, NAIA games, etc.), and time period (specific months or last 5/10 games).
 
-There's also a **Visualizations** toggle that shows the same data as interactive charts instead of a table.
+There's also a **Charts** toggle that shows the same data as interactive charts instead of a table.
 
 ### 2. Players
 Individual player statistics for the current season. Sortable by points, rebounds, assists, shooting percentages, and more. You can filter by conference, team, position, and class year.

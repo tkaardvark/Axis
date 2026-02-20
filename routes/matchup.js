@@ -124,14 +124,40 @@ router.get('/api/matchup', async (req, res) => {
     };
 
     // Get head-to-head games
-    const h2hResult = await pool.query(
-      `SELECT g.game_date, g.team_id, g.opponent_id, g.team_score, g.opponent_score, g.location, g.is_completed
-       FROM games g
-       WHERE g.season = $1 AND g.is_completed = true
-         AND ((g.team_id = $2 AND g.opponent_id = $3) OR (g.team_id = $3 AND g.opponent_id = $2))
-       ORDER BY g.game_date ASC`,
-      [season, team1, team2]
-    );
+    let h2hResult;
+    if (useBoxScore) {
+      h2hResult = await pool.query(
+        `SELECT game_date, team_id, opponent_id, team_score, opponent_score, location, true as is_completed
+         FROM (
+           SELECT e.game_date, e.away_team_id as team_id, e.home_team_id as opponent_id,
+             e.away_score as team_score, e.home_score as opponent_score,
+             CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location
+           FROM exp_game_box_scores e
+           WHERE e.season = $1
+             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+             AND ((e.away_team_id = $2 AND e.home_team_id = $3) OR (e.away_team_id = $3 AND e.home_team_id = $2))
+           UNION ALL
+           SELECT e.game_date, e.home_team_id as team_id, e.away_team_id as opponent_id,
+             e.home_score as team_score, e.away_score as opponent_score,
+             CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location
+           FROM exp_game_box_scores e
+           WHERE e.season = $1
+             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+             AND ((e.away_team_id = $2 AND e.home_team_id = $3) OR (e.away_team_id = $3 AND e.home_team_id = $2))
+         ) flat
+         ORDER BY game_date ASC`,
+        [season, team1, team2]
+      );
+    } else {
+      h2hResult = await pool.query(
+        `SELECT g.game_date, g.team_id, g.opponent_id, g.team_score, g.opponent_score, g.location, g.is_completed
+         FROM games g
+         WHERE g.season = $1 AND g.is_completed = true
+           AND ((g.team_id = $2 AND g.opponent_id = $3) OR (g.team_id = $3 AND g.opponent_id = $2))
+         ORDER BY g.game_date ASC`,
+        [season, team1, team2]
+      );
+    }
 
     // Deduplicate H2H (keep from team1's perspective)
     const seenH2H = new Set();
@@ -208,8 +234,8 @@ router.get('/api/games/:gameId/boxscore', async (req, res) => {
           t1.team_id as away_tid, t1.logo_url as away_logo_url,
           t2.team_id as home_tid, t2.logo_url as home_logo_url
          FROM exp_game_box_scores e
-         LEFT JOIN teams t1 ON t1.name = e.away_team_name AND t1.season = e.season AND t1.league = e.league
-         LEFT JOIN teams t2 ON t2.name = e.home_team_name AND t2.season = e.season AND t2.league = e.league
+         LEFT JOIN teams t1 ON t1.team_id = e.away_team_id AND t1.season = e.season
+         LEFT JOIN teams t2 ON t2.team_id = e.home_team_id AND t2.season = e.season
          WHERE e.id = $1 AND e.season = $2`,
         [gameId, season]
       );

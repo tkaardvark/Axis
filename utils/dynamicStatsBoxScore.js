@@ -115,7 +115,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
         e.home_fastbreak_points as opp_pts_fastbreak,
         e.home_points_off_turnovers as opp_pts_turnovers
       FROM exp_game_box_scores e
-      JOIN teams t ON t.name = e.away_team_name AND t.season = e.season
+      JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
       WHERE ${expWhereClause}
         AND t.league = $1
 
@@ -162,7 +162,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
         e.away_fastbreak_points as opp_pts_fastbreak,
         e.away_points_off_turnovers as opp_pts_turnovers
       FROM exp_game_box_scores e
-      JOIN teams t ON t.name = e.home_team_name AND t.season = e.season
+      JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
       WHERE ${expWhereClause}
         AND t.league = $1
     )`;
@@ -445,15 +445,15 @@ function buildAggregateSelects(alias) {
  * @param {string} season
  * @returns {Promise<Array>} Game rows with team-centric stats
  */
-async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON) {
+async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON, league = 'mens') {
   const result = await pool.query(`
     -- Away team perspective (team is the away team)
     SELECT
       e.id as game_id,
       e.game_date,
-      'away' as location,
+      CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location,
       e.home_team_name as opponent_name,
-      opp_t.team_id as opponent_id,
+      e.home_team_id as opponent_id,
       opp_t.name as opponent_team_name,
       opp_t.logo_url as opponent_logo_url,
       e.away_score as team_score,
@@ -461,8 +461,8 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON) {
       e.is_conference,
       e.is_exhibition,
       e.is_postseason,
-      true as is_naia_game,
-      false as is_national_tournament,
+      COALESCE(e.is_naia_game, false) as is_naia_game,
+      COALESCE(e.is_national_tournament, false) as is_national_tournament,
       true as is_completed,
       -- Team stats
       e.away_fgm as fgm, e.away_fga as fga, e.away_fgm3 as fgm3, e.away_fga3 as fga3,
@@ -488,9 +488,9 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON) {
       e.away_period_scores as period_scores,
       e.home_period_scores as opp_period_scores
     FROM exp_game_box_scores e
-    JOIN teams t ON t.name = e.away_team_name AND t.season = e.season
-    LEFT JOIN teams opp_t ON opp_t.name = e.home_team_name AND opp_t.season = e.season AND opp_t.league = t.league
-    WHERE t.team_id = $1 AND e.season = $2
+    JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+    LEFT JOIN teams opp_t ON opp_t.team_id = e.home_team_id AND opp_t.season = e.season
+    WHERE t.team_id = $1 AND e.season = $2 AND e.league = $3
       AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
 
     UNION ALL
@@ -499,9 +499,9 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON) {
     SELECT
       e.id as game_id,
       e.game_date,
-      'home' as location,
+      CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location,
       e.away_team_name as opponent_name,
-      opp_t.team_id as opponent_id,
+      e.away_team_id as opponent_id,
       opp_t.name as opponent_team_name,
       opp_t.logo_url as opponent_logo_url,
       e.home_score as team_score,
@@ -509,8 +509,8 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON) {
       e.is_conference,
       e.is_exhibition,
       e.is_postseason,
-      true as is_naia_game,
-      false as is_national_tournament,
+      COALESCE(e.is_naia_game, false) as is_naia_game,
+      COALESCE(e.is_national_tournament, false) as is_national_tournament,
       true as is_completed,
       -- Team stats
       e.home_fgm as fgm, e.home_fga as fga, e.home_fgm3 as fgm3, e.home_fga3 as fga3,
@@ -536,13 +536,13 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON) {
       e.home_period_scores as period_scores,
       e.away_period_scores as opp_period_scores
     FROM exp_game_box_scores e
-    JOIN teams t ON t.name = e.home_team_name AND t.season = e.season
-    LEFT JOIN teams opp_t ON opp_t.name = e.away_team_name AND opp_t.season = e.season AND opp_t.league = t.league
-    WHERE t.team_id = $1 AND e.season = $2
+    JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+    LEFT JOIN teams opp_t ON opp_t.team_id = e.away_team_id AND opp_t.season = e.season
+    WHERE t.team_id = $1 AND e.season = $2 AND e.league = $3
       AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
 
     ORDER BY game_date DESC
-  `, [teamId, season]);
+  `, [teamId, season, league]);
 
   return result.rows;
 }

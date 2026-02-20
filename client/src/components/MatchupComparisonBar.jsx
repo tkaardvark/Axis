@@ -13,6 +13,17 @@ function MatchupComparisonBar({ label, team1Value, team2Value, format, higherIsB
     }
   };
 
+  const formatDiff = (diff) => {
+    switch (format) {
+      case 'pct1':
+      case 'pct3': return (diff * 100).toFixed(1) + '%';
+      case 'rating': return diff.toFixed(1);
+      case 'rating2': return diff.toFixed(2);
+      case 'int': return Math.round(diff).toString();
+      default: return diff.toFixed(1);
+    }
+  };
+
   const v1 = parseFloat(team1Value);
   const v2 = parseFloat(team2Value);
   const bothValid = !isNaN(v1) && !isNaN(v2);
@@ -39,6 +50,13 @@ function MatchupComparisonBar({ label, team1Value, team2Value, format, higherIsB
     }
   }
 
+  // Calculate the difference for display
+  let diffLabel = null;
+  if (bothValid) {
+    const diff = Math.abs(v1 - v2);
+    diffLabel = diff === 0 ? 'Even' : `Δ ${formatDiff(diff)}`;
+  }
+
   return (
     <div className="comparison-row" title={tooltip}>
       <div className="comparison-value comparison-value-left">
@@ -61,7 +79,10 @@ function MatchupComparisonBar({ label, team1Value, team2Value, format, higherIsB
       <div className="comparison-value comparison-value-right">
         <span className={team2Advantage ? 'value-advantage' : ''}>{formatValue(team2Value)}</span>
       </div>
-      <div className="comparison-label">{label}</div>
+      <div className="comparison-label">
+        {label}
+        {diffLabel && <span className="comparison-diff">{diffLabel}</span>}
+      </div>
     </div>
   );
 }

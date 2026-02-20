@@ -1,23 +1,41 @@
 const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
+const { resolveSource } = require('../utils/dataSource');
 
 // Get available months that have games
 router.get('/api/months', async (req, res) => {
   try {
-    const { league = 'mens', season = DEFAULT_SEASON } = req.query;
+    const { league = 'mens', season = DEFAULT_SEASON, source } = req.query;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
-    const result = await pool.query(`
-      SELECT DISTINCT
-        EXTRACT(MONTH FROM g.game_date)::int as month,
-        EXTRACT(YEAR FROM g.game_date)::int as year
-      FROM games g
-      JOIN teams t ON g.team_id = t.team_id
-      WHERE t.league = $1
-        AND g.season = $2
-        AND g.is_naia_game = true
-      ORDER BY year, month
-    `, [league, season]);
+    let result;
+    if (useBoxScore) {
+      result = await pool.query(`
+        SELECT DISTINCT
+          EXTRACT(MONTH FROM e.game_date)::int as month,
+          EXTRACT(YEAR FROM e.game_date)::int as year
+        FROM exp_game_box_scores e
+        JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+        WHERE t.league = $1
+          AND e.season = $2
+          AND COALESCE(e.is_naia_game, false) = true
+          AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+        ORDER BY year, month
+      `, [league, season]);
+    } else {
+      result = await pool.query(`
+        SELECT DISTINCT
+          EXTRACT(MONTH FROM g.game_date)::int as month,
+          EXTRACT(YEAR FROM g.game_date)::int as year
+        FROM games g
+        JOIN teams t ON g.team_id = t.team_id
+        WHERE t.league = $1
+          AND g.season = $2
+          AND g.is_naia_game = true
+        ORDER BY year, month
+      `, [league, season]);
+    }
 
     const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
                         'July', 'August', 'September', 'October', 'November', 'December'];
@@ -134,13 +152,24 @@ router.get('/api/health', (req, res) => {
 // Get last data update timestamp
 router.get('/api/last-updated', async (req, res) => {
   try {
-    const { season = DEFAULT_SEASON } = req.query;
-    // Get the most recent updated_at from games table (when game data was last imported)
-    const result = await pool.query(`
-      SELECT MAX(updated_at) as last_update
-      FROM games
-      WHERE season = $1
-    `, [season]);
+    const { season = DEFAULT_SEASON, league = 'mens', source } = req.query;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+
+    let result;
+    if (useBoxScore) {
+      result = await pool.query(`
+        SELECT MAX(updated_at) as last_update
+        FROM exp_game_box_scores
+        WHERE season = $1
+      `, [season]);
+    } else {
+      // Get the most recent updated_at from games table (when game data was last imported)
+      result = await pool.query(`
+        SELECT MAX(updated_at) as last_update
+        FROM games
+        WHERE season = $1
+      `, [season]);
+    }
 
     res.json({
       lastUpdated: result.rows[0].last_update,

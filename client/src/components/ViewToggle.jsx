@@ -10,10 +10,10 @@ function ViewToggle({ activeView, onViewChange }) {
         Table
       </button>
       <button
-        className={`page-tab ${activeView === 'visualizations' ? 'active' : ''}`}
-        onClick={() => onViewChange('visualizations')}
+        className={`page-tab ${activeView === 'charts' ? 'active' : ''}`}
+        onClick={() => onViewChange('charts')}
       >
-        Visualizations
+        Charts
       </button>
     </div>
   );

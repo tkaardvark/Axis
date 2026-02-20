@@ -223,7 +223,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
 
   // Fetch all players when switching to visualizations view
   useEffect(() => {
-    if (view === 'visualizations' && allPlayers.length === 0) {
+    if (view === 'charts' && allPlayers.length === 0) {
       fetchAllPlayers();
     }
   }, [view, allPlayers.length, fetchAllPlayers]);

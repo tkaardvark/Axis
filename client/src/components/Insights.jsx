@@ -35,14 +35,14 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
     
     let filtered = [...teams];
 
-    if (teamFilter === 'net100' || teamFilter === 'net50') {
-      const limit = teamFilter === 'net100' ? 100 : 50;
+    if (teamFilter === 'net100' || teamFilter === 'net50' || teamFilter === 'net75') {
+      const limit = teamFilter === 'net100' ? 100 : teamFilter === 'net75' ? 75 : 50;
       filtered = filtered
         .filter(t => t.adjusted_net_rating != null)
         .sort((a, b) => (b.adjusted_net_rating || 0) - (a.adjusted_net_rating || 0))
         .slice(0, limit);
-    } else if (teamFilter === 'rpi100' || teamFilter === 'rpi50') {
-      const limit = teamFilter === 'rpi100' ? 100 : 50;
+    } else if (teamFilter === 'rpi100' || teamFilter === 'rpi50' || teamFilter === 'rpi75') {
+      const limit = teamFilter === 'rpi100' ? 100 : teamFilter === 'rpi75' ? 75 : 50;
       filtered = filtered
         .filter(t => t.rpi != null)
         .sort((a, b) => (b.rpi || 0) - (a.rpi || 0))
@@ -54,18 +54,14 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
   }, [teams, teamFilter]);
 
   // Filter teams with required stats for each visualization
-  // Trapezoid of Excellence: limit to top 75 teams by RPI
   const topTeams = useMemo(() => {
     return baseFilteredTeams
-      .filter(t => t.adjusted_net_rating != null && t.pace != null && t.rpi != null)
-      .sort((a, b) => (b.rpi || 0) - (a.rpi || 0))  // Sort by RPI descending (higher is better)
-      .slice(0, 75);  // Top 75 by RPI
+      .filter(t => t.adjusted_net_rating != null && t.pace != null && t.rpi != null);
   }, [baseFilteredTeams]);
 
   const top40 = useMemo(() => {
     return baseFilteredTeams
-      .filter(t => t.adjusted_net_rating != null && t.adjusted_offensive_rating != null && t.adjusted_defensive_rating != null)
-      .slice(0, 40);
+      .filter(t => t.adjusted_net_rating != null && t.adjusted_offensive_rating != null && t.adjusted_defensive_rating != null);
   }, [baseFilteredTeams]);
 
   const shootingTeams = useMemo(() => {
@@ -137,7 +133,7 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
             <div className="insight-card-header">
               <h2 className="insight-title">Trapezoid of Excellence</h2>
               <p className="insight-description">
-                Pace vs. Adjusted Net Rating — top {topTeams.length} teams by RPI
+                Pace vs. Adjusted Net Rating — {topTeams.length} teams
               </p>
             </div>
             <TrapezoidChart teams={topTeams} onTeamClick={onTeamClick} />
@@ -147,7 +143,7 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
             <div className="insight-card-header">
               <h2 className="insight-title">Championship DNA</h2>
               <p className="insight-description">
-                Adj. Defensive Rating vs. Adj. Offensive Rating — top {top40.length} teams by AdjNET
+                Adj. Defensive Rating vs. Adj. Offensive Rating — {top40.length} teams
               </p>
             </div>
             <ChampionshipDNA teams={top40} onTeamClick={onTeamClick} />
@@ -376,7 +372,7 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
             <div className="insight-card-header">
               <h2 className="insight-title">10-Point Runs: Scored vs Allowed</h2>
               <p className="insight-description">
-                Unanswered 10+ point scoring runs per game — scored vs allowed. Top-right = frequently goes on runs while rarely allowing them.
+                Unanswered 10+ point scoring runs per game — scored vs allowed. Bottom-right = frequently goes on runs while rarely allowing them.
               </p>
             </div>
             <InsightScatterChart
@@ -482,7 +478,7 @@ function Insights({ teams, conferences = [], league, season, loading, onTeamClic
     <main className="main-content insights-page">
       <div className="page-header">
         <h1>Insights</h1>
-        <p className="page-subtitle">Advanced visualizations and analytical deep dives into team performance</p>
+        <p className="page-subtitle">Advanced charts and analytical deep dives into team performance</p>
       </div>
       {content}
     </main>

@@ -3,6 +3,7 @@ const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
 const { getConferenceChampions } = require('../utils/conferenceChampions');
 const { getQuadrant } = require('../utils/quadrant');
+const { resolveSource } = require('../utils/dataSource');
 
 // Conference to Area mapping based on NAIA Selection Committee Policy
 const CONFERENCE_AREAS = {
@@ -36,13 +37,25 @@ const CONFERENCE_AREAS = {
 // Get bracketcast data with quadrant records and seed projections
 router.get('/api/bracketcast', async (req, res) => {
   try {
-    const { league = 'mens', season = DEFAULT_SEASON, asOfDate: userAsOfDate } = req.query;
+    const { league = 'mens', season = DEFAULT_SEASON, asOfDate: userAsOfDate, source } = req.query;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
     // If user provides an asOfDate, use it; otherwise get the latest game date
     let asOfDate;
     if (userAsOfDate) {
       // User-provided date - use end of that day (games on that date are included)
       asOfDate = userAsOfDate;
+    } else if (useBoxScore) {
+      const asOfResult = await pool.query(`
+        SELECT MAX(e.game_date) as as_of_date
+        FROM exp_game_box_scores e
+        JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+        WHERE t.league = $1
+          AND e.season = $2
+          AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+          AND e.is_exhibition = false
+      `, [league, season]);
+      asOfDate = asOfResult.rows[0].as_of_date;
     } else {
       // Get the latest completed game date
       const asOfResult = await pool.query(`
@@ -85,7 +98,35 @@ router.get('/api/bracketcast', async (req, res) => {
     // Step 1b: Get total record (all games including non-NAIA, but only completed and non-exhibition)
     // Exclude national tournament games since bracketcast is for projecting seeds
     // Filter by asOfDate if provided
-    const totalRecordResult = await pool.query(`
+    let totalRecordResult;
+    if (useBoxScore) {
+      totalRecordResult = await pool.query(`
+        WITH flat AS (
+          SELECT t.team_id,
+            e.away_score as team_score, e.home_score as opponent_score
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND COALESCE(e.is_national_tournament, false) = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            AND ($3::date IS NULL OR e.game_date <= $3::date)
+          UNION ALL
+          SELECT t.team_id,
+            e.home_score as team_score, e.away_score as opponent_score
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND COALESCE(e.is_national_tournament, false) = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            AND ($3::date IS NULL OR e.game_date <= $3::date)
+        )
+        SELECT team_id,
+          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as total_wins,
+          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as total_losses
+        FROM flat GROUP BY team_id
+      `, [league, season, asOfDate]);
+    } else {
+      totalRecordResult = await pool.query(`
       SELECT
         g.team_id,
         SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as total_wins,
@@ -100,6 +141,7 @@ router.get('/api/bracketcast', async (req, res) => {
         AND ($3::date IS NULL OR g.game_date <= $3::date)
       GROUP BY g.team_id
     `, [league, season, asOfDate]);
+    }
 
     const totalRecords = {};
     totalRecordResult.rows.forEach(row => {
@@ -112,7 +154,37 @@ router.get('/api/bracketcast', async (req, res) => {
     // Step 1c: Get NAIA record from games table (using is_naia_game flag for consistency)
     // Exclude national tournament games since bracketcast is for projecting seeds
     // Filter by asOfDate if provided
-    const naiaRecordResult = await pool.query(`
+    let naiaRecordResult;
+    if (useBoxScore) {
+      naiaRecordResult = await pool.query(`
+        WITH flat AS (
+          SELECT t.team_id,
+            e.away_score as team_score, e.home_score as opponent_score
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND COALESCE(e.is_naia_game, false) = true
+            AND COALESCE(e.is_national_tournament, false) = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            AND ($3::date IS NULL OR e.game_date <= $3::date)
+          UNION ALL
+          SELECT t.team_id,
+            e.home_score as team_score, e.away_score as opponent_score
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND COALESCE(e.is_naia_game, false) = true
+            AND COALESCE(e.is_national_tournament, false) = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            AND ($3::date IS NULL OR e.game_date <= $3::date)
+        )
+        SELECT team_id,
+          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as naia_wins,
+          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as naia_losses
+        FROM flat GROUP BY team_id
+      `, [league, season, asOfDate]);
+    } else {
+      naiaRecordResult = await pool.query(`
       SELECT
         g.team_id,
         SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as naia_wins,
@@ -128,6 +200,7 @@ router.get('/api/bracketcast', async (req, res) => {
         AND ($3::date IS NULL OR g.game_date <= $3::date)
       GROUP BY g.team_id
     `, [league, season, asOfDate]);
+    }
 
     const naiaRecords = {};
     naiaRecordResult.rows.forEach(row => {
@@ -144,7 +217,43 @@ router.get('/api/bracketcast', async (req, res) => {
     // Step 2: Get all NAIA games for quadrant calculation
     // Exclude national tournament games since bracketcast is for projecting seeds
     // Filter by asOfDate if provided
-    const gamesResult = await pool.query(`
+    let gamesResult;
+    if (useBoxScore) {
+      gamesResult = await pool.query(`
+        WITH flat AS (
+          SELECT t.team_id,
+            e.home_team_id as opponent_id,
+            CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location,
+            e.away_score as team_score,
+            e.home_score as opponent_score,
+            e.is_conference
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND COALESCE(e.is_naia_game, false) = true
+            AND COALESCE(e.is_national_tournament, false) = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            AND ($3::date IS NULL OR e.game_date <= $3::date)
+          UNION ALL
+          SELECT t.team_id,
+            e.away_team_id as opponent_id,
+            CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location,
+            e.home_score as team_score,
+            e.away_score as opponent_score,
+            e.is_conference
+          FROM exp_game_box_scores e
+          JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+          WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
+            AND COALESCE(e.is_naia_game, false) = true
+            AND COALESCE(e.is_national_tournament, false) = false
+            AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            AND ($3::date IS NULL OR e.game_date <= $3::date)
+        )
+        SELECT team_id, opponent_id, location, team_score, opponent_score, is_conference
+        FROM flat
+      `, [league, season, asOfDate]);
+    } else {
+      gamesResult = await pool.query(`
       SELECT
         g.team_id,
         g.opponent_id,
@@ -161,6 +270,7 @@ router.get('/api/bracketcast', async (req, res) => {
         AND g.is_national_tournament = FALSE
         AND ($3::date IS NULL OR g.game_date <= $3::date)
     `, [league, season, asOfDate]);
+    }
 
     // Step 3: Calculate RPI on-the-fly from the date-filtered games
     // This ensures RPI rankings reflect only games up to the asOfDate

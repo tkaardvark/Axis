@@ -46,7 +46,7 @@ function App() {
   const conference = searchParams.get('conference') || DEFAULTS.conference;
   const opponent = searchParams.get('opponent') || DEFAULTS.opponent;
   const seasonSegment = searchParams.get('seasonSegment') || DEFAULTS.seasonSegment;
-  const vizFilter = searchParams.get('vizFilter') || 'all';
+  const vizFilter = searchParams.get('vizFilter') || 'net50';
   const statGroup = searchParams.get('statGroup') || DEFAULTS.statGroup;
   const view = searchParams.get('view') || DEFAULTS.view;
   const source = searchParams.get('source') || DEFAULTS.source;
@@ -281,7 +281,7 @@ function App() {
       conference: DEFAULTS.conference,
       opponent: DEFAULTS.opponent,
       seasonSegment: DEFAULTS.seasonSegment,
-      vizFilter: 'all',
+      vizFilter: 'net50',
     });
   };
 
@@ -363,7 +363,7 @@ function App() {
           <Routes>
             <Route path="/" element={<TeamsPage />} />
             <Route path="/teams" element={<Navigate to="/" replace />} />
-            <Route path="/insights" element={<Navigate to="/?view=visualizations" replace />} />
+            <Route path="/insights" element={<Navigate to="/?view=charts" replace />} />
             <Route
               path="/conferences"
               element={

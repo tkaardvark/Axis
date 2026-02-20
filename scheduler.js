@@ -99,11 +99,12 @@ async function scrapeJob() {
 }
 
 /**
- * Full data refresh: import latest game results and recalculate analytics.
+ * Recalculate team analytics (RPI, SOS, QWI, etc.).
+ * calculate-analytics.js fetches data from the Presto Sports API directly
+ * and writes to the team_ratings table — independent of the games table.
  * Runs every few hours during the season to stay up-to-date.
  */
-async function refreshJob() {
-  await runScript('import-data.js', ['--season', SEASON]);
+async function analyticsJob() {
   await runScript('calculate-analytics.js', ['--season', SEASON]);
 }
 
@@ -113,14 +114,16 @@ async function refreshJob() {
  */
 async function playersJob() {
   await runScript('import-players.js', ['--season', SEASON, '--league', 'mens']);
+  await runScript('import-players.js', ['--season', SEASON, '--league', 'womens']);
 }
 
 /**
- * Box score refresh: import yesterday's completed games from Presto Sports.
- * This is the primary data source for MBB 2025-26 — runs nightly after games finish.
- * Uses the experimental box score pipeline to fetch individual game box scores.
+ * Box score refresh: import yesterday's completed games from Presto Sports,
+ * then refresh the future games schedule.
+ * Runs for both men's and women's basketball.
  */
 async function boxScoreRefreshJob() {
+  // Men's box scores + future games
   await runScript('experimental/import-box-scores.js', [
     '--yesterday',
     '--season', SEASON,
@@ -128,6 +131,17 @@ async function boxScoreRefreshJob() {
     '--concurrency', '5',
     '--delay', '300',
   ]);
+  await runScript('import-future-games.js', ['--season', SEASON, '--league', 'mens']);
+
+  // Women's box scores + future games
+  await runScript('experimental/import-box-scores.js', [
+    '--yesterday',
+    '--season', SEASON,
+    '--league', 'womens',
+    '--concurrency', '5',
+    '--delay', '300',
+  ]);
+  await runScript('import-future-games.js', ['--season', SEASON, '--league', 'womens']);
 }
 
 // ─── Schedule Registration ──────────────────────────────────────────────────
@@ -141,9 +155,9 @@ function startScheduler() {
     timezone: tz,
   });
 
-  // ② Every 4 hours ET — refresh game data & analytics
+  // ② Every 4 hours ET — recalculate analytics (RPI, SOS, QWI, etc.)
   //    Runs at 2am, 6am, 10am, 2pm, 6pm, 10pm
-  cron.schedule('0 2,6,10,14,18,22 * * *', () => runJob('refresh', refreshJob), {
+  cron.schedule('0 2,6,10,14,18,22 * * *', () => runJob('analytics', analyticsJob), {
     timezone: tz,
   });
 
@@ -152,7 +166,7 @@ function startScheduler() {
     timezone: tz,
   });
 
-  // ④ 4:00 AM ET — box score refresh (import yesterday's games)
+  // ④ 4:00 AM ET — box score refresh + future games update
   //    Primary data source for MBB 2025-26 team/player stats
   cron.schedule('0 4 * * *', () => runJob('boxscore-refresh', boxScoreRefreshJob), {
     timezone: tz,
@@ -160,9 +174,9 @@ function startScheduler() {
 
   log('Scheduler initialized');
   log('  • Scrape team URLs & conferences — daily at 12:00 AM ET');
-  log('  • Refresh games & analytics      — every 4 hours (2,6,10,14,18,22 ET)');
+  log('  • Recalculate analytics          — every 4 hours (2,6,10,14,18,22 ET)');
   log('  • Import player stats            — daily at 3:00 AM ET');
-  log('  • Box score refresh (yesterday)  — daily at 4:00 AM ET');
+  log('  • Box score + future games       — daily at 4:00 AM ET');
 }
 
 module.exports = { startScheduler };

@@ -53,17 +53,19 @@ function FilterBar({ conferences, months, filters, onFilterChange, onReset, view
         </select>
       </div>
 
-      {view === 'visualizations' && (
+      {view === 'charts' && (
         <div className="filter-group">
           <label>Teams Shown</label>
           <select
-            value={filters.vizFilter || 'all'}
+            value={filters.vizFilter || 'net50'}
             onChange={(e) => onFilterChange('vizFilter', e.target.value)}
           >
             <option value="all">All Teams</option>
             <option value="net100">Top 100 — Adj. Net Rtg</option>
+            <option value="net75">Top 75 — Adj. Net Rtg</option>
             <option value="net50">Top 50 — Adj. Net Rtg</option>
             <option value="rpi100">Top 100 — RPI</option>
+            <option value="rpi75">Top 75 — RPI</option>
             <option value="rpi50">Top 50 — RPI</option>
           </select>
         </div>

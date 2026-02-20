@@ -392,6 +392,13 @@
   margin-top: -2px;
 }
 
+.comparison-diff {
+  margin-left: 6px;
+  font-size: 9px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
 .comparison-group-label {
   font-family: var(--font-heading);
   font-size: 11px;

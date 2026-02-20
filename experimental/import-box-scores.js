@@ -115,6 +115,7 @@ async function insertBoxScore(parsed) {
       away_period_scores, home_period_scores,
       status, num_periods, location_text, attendance,
       is_conference, is_division, is_exhibition, is_postseason,
+      is_national_tournament, is_neutral,
       ties, lead_changes,
       away_fgm, away_fga, away_fg_pct, away_fgm3, away_fga3, away_fg3_pct,
       away_ftm, away_fta, away_ft_pct, away_oreb, away_dreb, away_reb,
@@ -136,16 +137,17 @@ async function insertBoxScore(parsed) {
       $15, $16, $17, $18,
       $19, $20, $21, $22,
       $23, $24,
-      $25, $26, $27, $28, $29, $30,
-      $31, $32, $33, $34, $35, $36,
-      $37, $38, $39, $40, $41, $42,
-      $43, $44, $45, $46, $47, $48,
-      $49, $50, $51, $52, $53, $54,
-      $55, $56, $57, $58, $59, $60,
-      $61, $62, $63, $64, $65,
-      $66, $67,
-      $68, $69, $70, $71, $72,
-      $73, $74
+      $25, $26,
+      $27, $28, $29, $30, $31, $32,
+      $33, $34, $35, $36, $37, $38,
+      $39, $40, $41, $42, $43, $44,
+      $45, $46, $47, $48, $49, $50,
+      $51, $52, $53, $54, $55, $56,
+      $57, $58, $59, $60, $61, $62,
+      $63, $64, $65, $66, $67,
+      $68, $69,
+      $70, $71, $72, $73, $74,
+      $75, $76
     )
     ON CONFLICT (box_score_url, season)
     DO UPDATE SET
@@ -158,6 +160,8 @@ async function insertBoxScore(parsed) {
       is_division = EXCLUDED.is_division,
       is_exhibition = EXCLUDED.is_exhibition,
       is_postseason = EXCLUDED.is_postseason,
+      is_national_tournament = EXCLUDED.is_national_tournament,
+      is_neutral = EXCLUDED.is_neutral,
       ties = EXCLUDED.ties,
       lead_changes = EXCLUDED.lead_changes,
       away_points_in_paint = EXCLUDED.away_points_in_paint,
@@ -183,6 +187,7 @@ async function insertBoxScore(parsed) {
     JSON.stringify(game.away.periodScores), JSON.stringify(game.home.periodScores),
     game.status, game.numPeriods, game.locationText, game.attendance,
     game.isConference || false, game.isDivision || false, game.isExhibition || false, game.isPostseason || false,
+    game.isNationalTournament || false, game.isNeutral || false,
     game.ties, game.leadChanges,
     awayTotals.fgm, awayTotals.fga, awayTotals.fg_pct, awayTotals.fgm3, awayTotals.fga3, awayTotals.fg3_pct,
     awayTotals.ftm, awayTotals.fta, awayTotals.ft_pct, awayTotals.oreb, awayTotals.dreb, awayTotals.reb,
@@ -301,6 +306,16 @@ async function processBoxScore(gameMeta, gameDate) {
     parsed.game.isExhibition = gameMeta.isExhibition || false;
     parsed.game.isPostseason = gameMeta.isPostseason || false;
 
+    // Derive is_national_tournament: postseason games on or after March 12
+    // (same logic as import-data.js — national tournament starts mid-March)
+    const gd = new Date(gameDate + 'T00:00:00Z');
+    parsed.game.isNationalTournament = parsed.game.isPostseason
+      && gd.getUTCMonth() === 2 && gd.getUTCDate() >= 12;
+
+    // is_neutral defaults to false — we don't have neutral-site info from the scoreboard.
+    // The post-import markNaiaGames step handles is_neutral via games table cross-ref.
+    parsed.game.isNeutral = false;
+
     // Build flags label for display
     const flags = [];
     if (parsed.game.isExhibition) flags.push('EXH');
@@ -325,6 +340,54 @@ async function processBoxScore(gameMeta, gameDate) {
   } catch (err) {
     console.error(`  ❌ Error processing ${boxScoreUrl}: ${err.message}`);
     return null;
+  }
+}
+
+/**
+ * Post-import: mark is_naia_game on all exp_game_box_scores for a season.
+ * A game is NAIA when both teams exist in the `teams` table and are not excluded.
+ * Also marks is_neutral by cross-referencing the legacy `games` table.
+ */
+async function markNaiaGames(season) {
+  console.log('\n🏀 Marking NAIA games & neutral sites...');
+  const client = await pool.connect();
+  try {
+    // Reset to false first
+    await client.query(`
+      UPDATE exp_game_box_scores SET is_naia_game = false WHERE season = $1
+    `, [season]);
+
+    // Mark NAIA: both teams exist in teams table and neither is excluded
+    const naiaResult = await client.query(`
+      UPDATE exp_game_box_scores e
+      SET is_naia_game = true
+      FROM teams t_away, teams t_home
+      WHERE e.season = $1
+        AND e.is_exhibition = false
+        AND t_away.team_id = e.away_team_id AND t_away.season = $1 AND t_away.is_excluded = false
+        AND t_home.team_id = e.home_team_id AND t_home.season = $1 AND t_home.is_excluded = false
+    `, [season]);
+
+    // Mark neutral sites from legacy games table (while it still exists)
+    const neutralResult = await client.query(`
+      UPDATE exp_game_box_scores e
+      SET is_neutral = true
+      WHERE e.season = $1
+        AND e.is_neutral = false
+        AND EXISTS (
+          SELECT 1 FROM games g
+          JOIN teams t ON g.team_id = t.team_id AND t.season = $1
+          WHERE g.season = $1
+            AND g.location = 'neutral'
+            AND g.game_date = e.game_date
+            AND (t.name = e.home_team_name OR t.name = e.away_team_name)
+        )
+    `, [season]);
+
+    console.log(`   NAIA games: ${naiaResult.rowCount}`);
+    console.log(`   Neutral sites: ${neutralResult.rowCount}`);
+  } finally {
+    client.release();
   }
 }
 
@@ -426,6 +489,11 @@ async function main() {
       console.log(`  Errors:              ${totalErrors}`);
     }
     console.log('═══════════════════════════════════════════════════════');
+
+    // Post-import: mark NAIA games and neutral sites
+    if (!DRY_RUN && totalGames > 0) {
+      await markNaiaGames(SEASON);
+    }
 
   } catch (err) {
     console.error('Fatal error:', err);

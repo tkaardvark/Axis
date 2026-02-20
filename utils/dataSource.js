@@ -6,6 +6,7 @@
  *
  * Current policy:
  *   - MBB 2025-26 → boxscore by default
+ *   - WBB 2025-26 → boxscore by default
  *   - Everything else → legacy (original JSON-import pipeline)
  *   - Explicit ?source=legacy or ?source=boxscore always wins
  *
@@ -16,6 +17,7 @@
 // Seasons + leagues that have been fully loaded into exp_ tables
 const BOXSCORE_AVAILABLE = new Set([
   'mens:2025-26',
+  'womens:2025-26',
 ]);
 
 /**

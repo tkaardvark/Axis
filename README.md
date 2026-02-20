@@ -115,7 +115,7 @@ axis-analytics/
 
 | Page | Route | Description |
 |------|-------|-------------|
-| Teams | `/` | Team statistics table with sorting, filtering, and a visualizations view |
+| Teams | `/` | Team statistics table with sorting, filtering, and a charts view |
 | Players | `/players` | Individual player statistics with filtering and sorting |
 | Conferences | `/conferences` | Conference standings, power rankings, and head-to-head matrices |
 | Bracketcast | `/bracketcast` | National tournament seeding projections |
