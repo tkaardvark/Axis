@@ -39,6 +39,7 @@ export const TOOLTIPS = {
   efg_pct_opp: 'Opponent eFG% - Measures defensive effectiveness at limiting efficient shooting. Lower is better.',
   turnover_pct: 'Turnover Percentage - Turnovers per 100 possessions. Lower is better.',
   turnover_pct_opp: 'Opponent Turnover% - Turnovers forced per 100 opponent possessions. Higher is better.',
+  effective_possession_ratio: 'Effective Possession Ratio - (Possessions + OREB - TO) / Possessions. Measures extra chances created through rebounding minus chances lost to turnovers. Higher is better.',
   to_rate: 'Turnover Rate - Turnovers per 100 possessions. Lower is better.',
   to_rate_opp: 'Opponent Turnover Rate - Turnovers forced per 100 opponent possessions. Higher is better (more forced turnovers).',
   oreb_pct: 'Offensive Rebound % - Percentage of available offensive rebounds grabbed. Shows second-chance opportunity creation.',

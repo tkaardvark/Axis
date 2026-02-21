@@ -107,9 +107,13 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
   const [splits, setSplits] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [roster, setRoster] = useState([]);
+  const [lineups, setLineups] = useState([]);
+  const [lineupStats, setLineupStats] = useState([]);
   const [percentiles, setPercentiles] = useState(null);
   const [loading, setLoading] = useState(false);
   const [statGroup, setStatGroup] = useState('Overview');
+  const [lineupSort, setLineupSort] = useState({ column: 'gamesStarted', direction: 'desc' });
+  const [lineupStatsSort, setLineupStatsSort] = useState({ column: 'plusMinus', direction: 'desc' });
   const [boxScoreGameId, setBoxScoreGameId] = useState(null);
 
   // Update URL when tab changes
@@ -167,6 +171,8 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
       setSplits([]);
       setSchedule([]);
       setRoster([]);
+      setLineups([]);
+      setLineupStats([]);
       setPercentiles(null);
       return;
     }
@@ -174,19 +180,25 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
     const fetchTeamData = async () => {
       setLoading(true);
       try {
-        const [splitsRes, scheduleRes, percentilesRes, rosterRes] = await Promise.all([
+        const [splitsRes, scheduleRes, percentilesRes, rosterRes, lineupsRes, lineupStatsRes] = await Promise.all([
           fetch(`${API_URL}/api/teams/${selectedTeamId}/splits?season=${season}${sourceParam}`),
           fetch(`${API_URL}/api/teams/${selectedTeamId}/schedule?season=${season}${sourceParam}`),
           fetch(`${API_URL}/api/teams/${selectedTeamId}/percentiles?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/roster?season=${season}${sourceParam}`)
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/roster?season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/lineups?season=${season}${sourceParam}`),
+          fetch(`${API_URL}/api/teams/${selectedTeamId}/lineup-stats?season=${season}${sourceParam}`)
         ]);
         const splitsData = await splitsRes.json();
         const scheduleData = await scheduleRes.json();
         const percentilesData = await percentilesRes.json();
         const rosterData = await rosterRes.json();
+        const lineupsData = await lineupsRes.json();
+        const lineupStatsData = await lineupStatsRes.json();
         setSplits(splitsData.splits || []);
         setSchedule(scheduleData.games || []);
         setRoster(rosterData.roster || []);
+        setLineups(lineupsData.lineups || []);
+        setLineupStats(lineupStatsData.lineupStats || []);
         setPercentiles(percentilesData);
         setTeamData(selectedTeam);
       } catch (error) {
@@ -194,6 +206,8 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
         setSplits([]);
         setSchedule([]);
         setRoster([]);
+        setLineups([]);
+        setLineupStats([]);
         setPercentiles(null);
       } finally {
         setLoading(false);
@@ -368,6 +382,53 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
     }
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [teams, selectedConference]);
+
+  // Sorted starting lineups
+  const sortedLineups = useMemo(() => {
+    if (!lineups.length) return [];
+    const sorted = [...lineups].sort((a, b) => {
+      let aVal, bVal;
+      switch (lineupSort.column) {
+        case 'winPct': aVal = a.winPct; bVal = b.winPct; break;
+        case 'wins': aVal = a.wins; bVal = b.wins; break;
+        case 'losses': aVal = a.losses; bVal = b.losses; break;
+        default: aVal = a.gamesStarted; bVal = b.gamesStarted;
+      }
+      return lineupSort.direction === 'desc' ? bVal - aVal : aVal - bVal;
+    });
+    return sorted;
+  }, [lineups, lineupSort]);
+
+  // Sorted 5-man lineup stats
+  const sortedLineupStats = useMemo(() => {
+    if (!lineupStats.length) return [];
+    const sorted = [...lineupStats].sort((a, b) => {
+      let aVal, bVal;
+      switch (lineupStatsSort.column) {
+        case 'pointsScored': aVal = a.pointsScored; bVal = b.pointsScored; break;
+        case 'pointsAllowed': aVal = a.pointsAllowed; bVal = b.pointsAllowed; break;
+        case 'possessions': aVal = a.possessions; bVal = b.possessions; break;
+        default: aVal = a.plusMinus; bVal = b.plusMinus;
+      }
+      return lineupStatsSort.direction === 'desc' ? bVal - aVal : aVal - bVal;
+    });
+    return sorted;
+  }, [lineupStats, lineupStatsSort]);
+
+  // Toggle sort handlers
+  const toggleLineupSort = (column) => {
+    setLineupSort(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  const toggleLineupStatsSort = (column) => {
+    setLineupStatsSort(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
 
   // Set conference when team is selected from URL
   useEffect(() => {
@@ -798,6 +859,100 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
                         <td className="col-fg">{parseFloat(player.fg_pct).toFixed(1)}%</td>
                         <td className="col-3p">{parseFloat(player.fg3_pct).toFixed(1)}%</td>
                         <td className="col-ft">{parseFloat(player.ft_pct).toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Starting Lineups Section */}
+          {lineups.length > 0 && (
+            <section className="scout-section">
+              <div className="scout-section-header">
+                <h3>Starting Lineups</h3>
+              </div>
+              
+              <div className="scout-lineups-wrapper">
+                <table className="scout-lineups-table sortable-table">
+                  <thead>
+                    <tr>
+                      <th className="col-record sortable-header" onClick={() => toggleLineupSort('gamesStarted')}>
+                        Record {lineupSort.column === 'gamesStarted' && <span className="sort-arrow">{lineupSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
+                      <th className="col-winpct sortable-header" onClick={() => toggleLineupSort('winPct')}>
+                        Win% {lineupSort.column === 'winPct' && <span className="sort-arrow">{lineupSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
+                      <th className="col-lineup">Starting Five</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedLineups.map((lineup, idx) => (
+                      <tr key={idx}>
+                        <td className="col-record">
+                          <span className="lineup-record-text">{lineup.wins}-{lineup.losses}</span>
+                          <span className="lineup-games-text">({lineup.gamesStarted}g)</span>
+                        </td>
+                        <td className={`col-winpct ${lineup.winPct >= 0.5 ? 'positive' : 'negative'}`}>
+                          {(lineup.winPct * 100).toFixed(0)}%
+                        </td>
+                        <td className="col-lineup">
+                          {lineup.players.map((player, pIdx) => (
+                            <span key={pIdx} className="lineup-player-chip">
+                              {player.name}
+                            </span>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Lineup +/- Stats Section */}
+          {lineupStats.length > 0 && (
+            <section className="scout-section">
+              <div className="scout-section-header">
+                <h3>5-Man Lineup +/-</h3>
+                <span className="section-subtitle">Based on play-by-play substitution tracking</span>
+              </div>
+              
+              <div className="scout-lineups-wrapper">
+                <table className="scout-lineups-table lineup-stats-table sortable-table">
+                  <thead>
+                    <tr>
+                      <th className="col-plusminus sortable-header" onClick={() => toggleLineupStatsSort('plusMinus')}>
+                        +/- {lineupStatsSort.column === 'plusMinus' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
+                      <th className="col-pts sortable-header" onClick={() => toggleLineupStatsSort('pointsScored')}>
+                        PTS {lineupStatsSort.column === 'pointsScored' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
+                      <th className="col-pts sortable-header" onClick={() => toggleLineupStatsSort('pointsAllowed')}>
+                        OPP {lineupStatsSort.column === 'pointsAllowed' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
+                      <th className="col-poss sortable-header" onClick={() => toggleLineupStatsSort('possessions')}>
+                        POSS {lineupStatsSort.column === 'possessions' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
+                      <th className="col-lineup">Lineup</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedLineupStats.map((lineup, idx) => (
+                      <tr key={idx}>
+                        <td className={`col-plusminus ${lineup.plusMinus >= 0 ? 'positive' : 'negative'}`}>
+                          {lineup.plusMinus >= 0 ? '+' : ''}{lineup.plusMinus}
+                        </td>
+                        <td className="col-pts">{lineup.pointsScored}</td>
+                        <td className="col-pts">{lineup.pointsAllowed}</td>
+                        <td className="col-poss">{lineup.possessions}</td>
+                        <td className="col-lineup">
+                          {lineup.players.map((player, pIdx) => (
+                            <span key={pIdx} className="lineup-player-chip">{player}</span>
+                          ))}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

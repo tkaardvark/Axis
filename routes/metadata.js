@@ -180,4 +180,53 @@ router.get('/api/last-updated', async (req, res) => {
   }
 });
 
+// Get recent box score import log entries (gap-fill discoveries)
+router.get('/api/import-log', async (req, res) => {
+  try {
+    const { limit = 50, source, season, league } = req.query;
+
+    let whereConditions = [];
+    let params = [];
+    let paramIdx = 1;
+
+    if (source) {
+      whereConditions.push(`source = $${paramIdx++}`);
+      params.push(source);
+    }
+    if (season) {
+      whereConditions.push(`season = $${paramIdx++}`);
+      params.push(season);
+    }
+    if (league) {
+      whereConditions.push(`league = $${paramIdx++}`);
+      params.push(league);
+    }
+
+    const whereClause = whereConditions.length > 0
+      ? `WHERE ${whereConditions.join(' AND ')}`
+      : '';
+
+    const result = await pool.query(`
+      SELECT id, box_score_url, season, league, game_date,
+             away_team_name, home_team_name, away_score, home_score,
+             source, job_name, lookback_days,
+             player_count, play_count, status, error_message,
+             created_at
+      FROM box_score_import_log
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT $${paramIdx}
+    `, [...params, Math.min(parseInt(limit), 200)]);
+
+    res.json(result.rows);
+  } catch (err) {
+    // Table might not exist yet — return empty array
+    if (err.code === '42P01') {
+      return res.json([]);
+    }
+    console.error('Error fetching import log:', err);
+    res.status(500).json({ error: 'Failed to fetch import log' });
+  }
+});
+
 module.exports = router;

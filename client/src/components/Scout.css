@@ -1243,3 +1243,182 @@
     padding: 3px 6px;
   }
 }
+
+/* Starting Lineups & Lineup +/- Tables */
+.scout-lineups-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 8px;
+}
+
+.scout-lineups-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.scout-lineups-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border-primary);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.scout-lineups-table th.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.scout-lineups-table th.sortable-header:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.scout-lineups-table .sort-arrow {
+  font-size: 9px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.scout-lineups-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border-primary);
+  vertical-align: middle;
+}
+
+.scout-lineups-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.scout-lineups-table tbody tr:hover {
+  background: var(--color-bg-hover);
+}
+
+.scout-lineups-table .col-record {
+  width: 90px;
+  white-space: nowrap;
+}
+
+.scout-lineups-table .col-winpct {
+  width: 60px;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.scout-lineups-table .col-winpct.positive {
+  color: var(--color-success);
+}
+
+.scout-lineups-table .col-winpct.negative {
+  color: var(--color-error);
+}
+
+.scout-lineups-table .col-plusminus {
+  width: 70px;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.scout-lineups-table .col-plusminus.positive {
+  color: var(--color-success);
+}
+
+.scout-lineups-table .col-plusminus.negative {
+  color: var(--color-error);
+}
+
+.scout-lineups-table .col-pts,
+.scout-lineups-table .col-poss {
+  width: 60px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Header alignment to match data columns */
+.scout-lineups-table th.col-plusminus,
+.scout-lineups-table th.col-pts,
+.scout-lineups-table th.col-poss {
+  text-align: center;
+}
+
+/* Keep sort arrows inline with text */
+.scout-lineups-table th.sortable-header {
+  white-space: nowrap;
+}
+
+.scout-lineups-table td.col-lineup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lineup-record-text {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.lineup-games-text {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-left: 4px;
+}
+
+.lineup-player-chip {
+  display: inline-block;
+  background: var(--color-bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.scout-section-header .section-subtitle {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+  margin-left: 12px;
+}
+
+@media (max-width: 768px) {
+  .scout-lineups-table {
+    font-size: 12px;
+  }
+  
+  .scout-lineups-table th,
+  .scout-lineups-table td {
+    padding: 8px;
+  }
+  
+  .scout-lineups-table .col-plusminus {
+    font-size: 14px;
+  }
+  
+  .lineup-player-chip {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  
+  .scout-section-header .section-subtitle {
+    display: block;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+}
+

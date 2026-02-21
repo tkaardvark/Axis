@@ -291,6 +291,10 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
       ROUND(CASE WHEN gs.games_played > 0
         THEN (gs.total_fga - gs.total_oreb + gs.total_to + 0.475 * gs.total_fta)::float / gs.games_played
         ELSE 0 END::numeric, 1) as pace,
+      -- Effective Possession Ratio: (Possessions + OREB - TO) / Possessions
+      ROUND(CASE WHEN (gs.total_fga - gs.total_oreb + gs.total_to + 0.475 * gs.total_fta) > 0
+        THEN (gs.total_fga + 0.475 * gs.total_fta)::float / (gs.total_fga - gs.total_oreb + gs.total_to + 0.475 * gs.total_fta)
+        ELSE 1 END::numeric, 3) as effective_possession_ratio,
       -- Rebounding
       ROUND(gs.oreb_pct::numeric, 3) as oreb_pct,
       ROUND(gs.dreb_pct::numeric, 3) as dreb_pct,

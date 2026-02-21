@@ -4,9 +4,13 @@
  * Runs inside the server process using node-cron so no extra Render services are needed.
  *
  * Schedule (all times US Eastern):
- *   - Midnight:  Scrape team URLs + conferences for the current season
- *   - Every 4h:  Refresh game data (import + analytics) — runs at 2am, 6am, 10am, 2pm, 6pm, 10pm
- *   - 3:00 AM:   Import player stats
+ *   - Midnight:    Scrape team URLs + conferences for the current season
+ *   - Every 4h:    Refresh game data (import + analytics) — runs at 2am, 6am, 10am, 2pm, 6pm, 10pm
+ *   - 3:00 AM:     Import player stats
+ *   - 4:00 AM:     Box score refresh (yesterday) + future games
+ *   - 5:00 AM:     Nightly gap-fill — discover missing box scores via team pages (3-day lookback)
+ *   - 6:00 AM Sun: Weekly deep gap-fill — 14-day lookback for delayed team page links
+ *   - Every 2h:    Intraday scoreboard check for today's finished games (4pm–midnight ET)
  *
  * Each job guards against overlapping runs and logs start/end times.
  * Errors are caught so the server keeps running regardless.
@@ -144,6 +148,87 @@ async function boxScoreRefreshJob() {
   await runScript('import-future-games.js', ['--season', SEASON, '--league', 'womens']);
 }
 
+/**
+ * Intraday scoreboard check: import today's finished games.
+ * Runs every 2 hours during game hours (4pm–midnight ET) to capture
+ * newly completed games throughout the evening.
+ * Uses the scoreboard (fast, lightweight).
+ */
+async function intradayBoxScoreJob() {
+  // Men's today
+  await runScript('experimental/import-box-scores.js', [
+    '--today',
+    '--season', SEASON,
+    '--league', 'mens',
+    '--concurrency', '5',
+    '--delay', '300',
+  ]);
+
+  // Women's today
+  await runScript('experimental/import-box-scores.js', [
+    '--today',
+    '--season', SEASON,
+    '--league', 'womens',
+    '--concurrency', '5',
+    '--delay', '300',
+  ]);
+}
+
+/**
+ * Nightly gap-fill: scan team pages for box scores that the scoreboard
+ * missed (games listed without XML links on the scoreboard).
+ * Uses a 3-day lookback to catch recently-completed games.
+ * Logs discoveries to box_score_import_log for visibility.
+ */
+async function gapFillNightlyJob() {
+  // Men's gap-fill (last 3 days)
+  await runScript('experimental/fill-missing-box-scores.js', [
+    '--season', SEASON,
+    '--league', 'mens',
+    '--lookback', '3',
+    '--job-name', 'gap-fill-nightly',
+    '--concurrency', '5',
+    '--delay', '300',
+  ]);
+
+  // Women's gap-fill (last 3 days)
+  await runScript('experimental/fill-missing-box-scores.js', [
+    '--season', SEASON,
+    '--league', 'womens',
+    '--lookback', '3',
+    '--job-name', 'gap-fill-nightly',
+    '--concurrency', '5',
+    '--delay', '300',
+  ]);
+}
+
+/**
+ * Weekly deep gap-fill: broader lookback (14 days) to catch games whose
+ * team page links appeared days after the game was played.
+ * Only runs once per week to avoid excessive scraping.
+ */
+async function gapFillWeeklyJob() {
+  // Men's deep scan (last 14 days)
+  await runScript('experimental/fill-missing-box-scores.js', [
+    '--season', SEASON,
+    '--league', 'mens',
+    '--lookback', '14',
+    '--job-name', 'gap-fill-weekly',
+    '--concurrency', '3',
+    '--delay', '500',
+  ]);
+
+  // Women's deep scan (last 14 days)
+  await runScript('experimental/fill-missing-box-scores.js', [
+    '--season', SEASON,
+    '--league', 'womens',
+    '--lookback', '14',
+    '--job-name', 'gap-fill-weekly',
+    '--concurrency', '3',
+    '--delay', '500',
+  ]);
+}
+
 // ─── Schedule Registration ──────────────────────────────────────────────────
 
 function startScheduler() {
@@ -166,9 +251,29 @@ function startScheduler() {
     timezone: tz,
   });
 
-  // ④ 4:00 AM ET — box score refresh + future games update
-  //    Primary data source for MBB 2025-26 team/player stats
+  // ④ 4:00 AM ET — box score refresh (yesterday) + future games update
+  //    Primary data source for MBB/WBB team/player stats
   cron.schedule('0 4 * * *', () => runJob('boxscore-refresh', boxScoreRefreshJob), {
+    timezone: tz,
+  });
+
+  // ⑤ 5:00 AM ET — nightly gap-fill (3-day lookback)
+  //    Discovers box scores missed by the scoreboard scraper by
+  //    checking team game log pages. Logs discoveries to DB.
+  cron.schedule('0 5 * * *', () => runJob('gap-fill-nightly', gapFillNightlyJob), {
+    timezone: tz,
+  });
+
+  // ⑥ 6:00 AM ET Sundays — weekly deep gap-fill (14-day lookback)
+  //    Catches games whose team page links appeared days after the game.
+  cron.schedule('0 6 * * 0', () => runJob('gap-fill-weekly', gapFillWeeklyJob), {
+    timezone: tz,
+  });
+
+  // ⑦ Every 2 hours 4pm–midnight ET — intraday scoreboard check
+  //    Checks today's scoreboard for newly finished games so data
+  //    is available within a couple hours of game completion.
+  cron.schedule('0 16,18,20,22,0 * * *', () => runJob('intraday-boxscore', intradayBoxScoreJob), {
     timezone: tz,
   });
 
@@ -177,6 +282,9 @@ function startScheduler() {
   log('  • Recalculate analytics          — every 4 hours (2,6,10,14,18,22 ET)');
   log('  • Import player stats            — daily at 3:00 AM ET');
   log('  • Box score + future games       — daily at 4:00 AM ET');
+  log('  • Gap-fill (3-day lookback)       — daily at 5:00 AM ET');
+  log('  • Gap-fill deep (14-day lookback) — Sundays at 6:00 AM ET');
+  log('  • Intraday scoreboard check      — every 2h (4pm–midnight ET)');
 }
 
 module.exports = { startScheduler };

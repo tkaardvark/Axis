@@ -34,6 +34,7 @@ const {
   fetchBoxScoreHtml,
 } = require('./scrape-scoreboard');
 const { parseBoxScore } = require('./parse-box-score');
+const { refreshTeamStats } = require('../utils/refreshTeamStats');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -493,6 +494,8 @@ async function main() {
     // Post-import: mark NAIA games and neutral sites
     if (!DRY_RUN && totalGames > 0) {
       await markNaiaGames(SEASON);
+      // Refresh pre-calculated team stats from box score data
+      await refreshTeamStats(SEASON, LEAGUE);
     }
 
   } catch (err) {
@@ -503,4 +506,14 @@ async function main() {
   }
 }
 
-main();
+// Only run main when this file is executed directly
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  insertBoxScore,
+  processBoxScore,
+  markNaiaGames,
+  processBatch,
+};

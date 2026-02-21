@@ -7,12 +7,65 @@ import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
 
 /**
+ * Parse game clock string (e.g., "15:32") to seconds remaining in period
+ */
+function parseClockToSeconds(clock) {
+  if (!clock) return 0;
+  const parts = clock.split(':');
+  if (parts.length !== 2) return 0;
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
+
+/**
+ * Get game format based on league
+ * Men's basketball: 2 halves (20 min each)
+ * Women's basketball: 4 quarters (10 min each)
+ */
+function getGameFormat(league) {
+  if (league === 'womens') {
+    return { periodLength: 600, regulationPeriods: 4, otLength: 300 }; // 10-min quarters, 5-min OT
+  }
+  return { periodLength: 1200, regulationPeriods: 2, otLength: 300 }; // 20-min halves, 5-min OT
+}
+
+/**
+ * Calculate elapsed game time in seconds from period and clock
+ * Handles both halves (2x20min) and quarters (4x10min) formats
+ */
+function getElapsedSeconds(period, clock, format) {
+  const clockSeconds = parseClockToSeconds(clock);
+  const { periodLength, regulationPeriods, otLength } = format;
+  
+  if (period <= regulationPeriods) {
+    // Regulation period
+    return (period - 1) * periodLength + (periodLength - clockSeconds);
+  } else {
+    // Overtime period
+    const regulationTime = regulationPeriods * periodLength;
+    const otPeriod = period - regulationPeriods;
+    return regulationTime + (otPeriod - 1) * otLength + (otLength - clockSeconds);
+  }
+}
+
+/**
+ * Format seconds to "M:SS" display string
+ */
+function formatDroughtTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
  * Compute game flow stats from score_progression:
  *  - largest lead for each team
  *  - largest scoring run for each team
+ *  - longest scoring drought for each team
  */
-function computeGameFlow(scoreProgression) {
+function computeGameFlow(scoreProgression, league) {
   if (!scoreProgression || scoreProgression.length < 2) return null;
+
+  const format = getGameFormat(league);
 
   let awayLargestLead = 0;
   let homeLargestLead = 0;
@@ -22,6 +75,12 @@ function computeGameFlow(scoreProgression) {
   let homeLargestRun = 0;
   let currentRunTeam = null; // 'away' | 'home'
   let currentRunPts = 0;
+
+  // For longest drought: track time since last score for each team
+  let awayLongestDrought = 0;
+  let homeLongestDrought = 0;
+  let awayLastScoreTime = 0; // Start of game
+  let homeLastScoreTime = 0; // Start of game
 
   let prevAway = 0;
   let prevHome = 0;
@@ -34,8 +93,14 @@ function computeGameFlow(scoreProgression) {
     // Determine who scored
     const awayScored = p.awayScore - prevAway;
     const homeScored = p.homeScore - prevHome;
+    const currentTime = getElapsedSeconds(p.period, p.clock, format);
 
     if (awayScored > 0) {
+      // Calculate drought ending for away team
+      const droughtDuration = currentTime - awayLastScoreTime;
+      if (droughtDuration > awayLongestDrought) awayLongestDrought = droughtDuration;
+      awayLastScoreTime = currentTime;
+
       if (currentRunTeam === 'away') {
         currentRunPts += awayScored;
       } else {
@@ -45,6 +110,11 @@ function computeGameFlow(scoreProgression) {
       if (currentRunPts > awayLargestRun) awayLargestRun = currentRunPts;
     }
     if (homeScored > 0) {
+      // Calculate drought ending for home team
+      const droughtDuration = currentTime - homeLastScoreTime;
+      if (droughtDuration > homeLongestDrought) homeLongestDrought = droughtDuration;
+      homeLastScoreTime = currentTime;
+
       if (currentRunTeam === 'home') {
         currentRunPts += homeScored;
       } else {
@@ -58,7 +128,14 @@ function computeGameFlow(scoreProgression) {
     prevHome = p.homeScore;
   }
 
-  return { awayLargestLead, homeLargestLead, awayLargestRun, homeLargestRun };
+  return {
+    awayLargestLead,
+    homeLargestLead,
+    awayLargestRun,
+    homeLargestRun,
+    awayLongestDrought: awayLongestDrought > 0 ? formatDroughtTime(awayLongestDrought) : null,
+    homeLongestDrought: homeLongestDrought > 0 ? formatDroughtTime(homeLongestDrought) : null,
+  };
 }
 
 function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
@@ -110,7 +187,7 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
 
   const gameFlow = useMemo(() => {
     if (!data?.score_progression) return null;
-    return computeGameFlow(data.score_progression);
+    return computeGameFlow(data.score_progression, data.league);
   }, [data]);
 
   if (!gameId) return null;
@@ -255,6 +332,9 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
                       )}
                       {gameFlow && (
                         <StatRow label="Largest Run" team={gameFlow.awayLargestRun > 0 ? `${gameFlow.awayLargestRun}-0` : '-'} opp={gameFlow.homeLargestRun > 0 ? `${gameFlow.homeLargestRun}-0` : '-'} />
+                      )}
+                      {gameFlow && (gameFlow.awayLongestDrought || gameFlow.homeLongestDrought) && (
+                        <StatRow label="Longest Drought" team={gameFlow.awayLongestDrought || '-'} opp={gameFlow.homeLongestDrought || '-'} lowerBetter />
                       )}
                       {data.attendance != null && data.attendance > 0 && (
                         <CenterRow label="Attendance" value={data.attendance.toLocaleString()} />

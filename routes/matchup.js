@@ -302,6 +302,7 @@ router.get('/api/games/:gameId/boxscore', async (req, res) => {
         game_id: g.id,
         date: g.game_date,
         location: g.location_text,
+        league: g.league,
         is_completed: true,
         period_scores: {
           away: g.away_period_scores,

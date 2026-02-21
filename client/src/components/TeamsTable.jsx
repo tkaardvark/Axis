@@ -40,6 +40,7 @@ const STAT_GROUPS = {
       { key: 'ft_pct', label: 'FT%', format: 'pct1' },
       { key: 'ast_per_game', label: 'APG', format: 'rating' },
       { key: 'to_per_game', label: 'TOPG', format: 'rating', lowerIsBetter: true },
+      { key: 'effective_possession_ratio', label: 'EPR', format: 'pct1' },
       { key: 'three_pt_rate', label: '3P Rate', format: 'pct1' },
       { key: 'ft_rate', label: 'FT Rate', format: 'pct1' },
       { key: 'pts_paint_per_game', label: 'Paint', format: 'rating' },

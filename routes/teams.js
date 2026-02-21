@@ -1028,4 +1028,315 @@ router.get('/api/teams/:teamId/roster', async (req, res) => {
   }
 });
 
+// Get team starting lineups with win/loss records
+router.get('/api/teams/:teamId/lineups', async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const { season = DEFAULT_SEASON, source } = req.query;
+
+    // Resolve source from team's league
+    const teamCheck = await pool.query('SELECT name, league FROM teams WHERE team_id = $1 AND season = $2', [teamId, season]);
+    if (!teamCheck.rows.length) return res.status(404).json({ error: 'Team not found' });
+    const teamName = teamCheck.rows[0].name;
+    const league = teamCheck.rows[0].league;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+
+    if (!useBoxScore) {
+      // Legacy source doesn't have starter data
+      return res.json({ lineups: [], totalGamesWithStarters: 0 });
+    }
+
+    // Get all games with starters for this team
+    const gamesResult = await pool.query(`
+      SELECT 
+        g.id as game_id,
+        g.game_date,
+        g.home_team_name,
+        g.away_team_name,
+        g.home_score,
+        g.away_score,
+        CASE WHEN g.home_team_name = $1 THEN g.home_score ELSE g.away_score END as team_score,
+        CASE WHEN g.home_team_name = $1 THEN g.away_score ELSE g.home_score END as opp_score,
+        CASE WHEN g.home_team_name = $1 THEN g.away_team_name ELSE g.home_team_name END as opponent
+      FROM exp_game_box_scores g
+      WHERE g.season = $2 
+        AND g.league = $3
+        AND g.is_exhibition = false
+        AND (g.home_team_name = $1 OR g.away_team_name = $1)
+        AND g.home_score IS NOT NULL
+      ORDER BY g.game_date
+    `, [teamName, season, league]);
+
+    if (!gamesResult.rows.length) {
+      return res.json({ lineups: [], totalGamesWithStarters: 0 });
+    }
+
+    // For each game, get the 5 starters for this team
+    const gameIds = gamesResult.rows.map(g => g.game_id);
+    const startersResult = await pool.query(`
+      SELECT 
+        p.game_box_score_id,
+        p.player_name,
+        p.player_id,
+        p.uniform_number
+      FROM exp_player_game_stats p
+      WHERE p.game_box_score_id = ANY($1)
+        AND p.team_name = $2
+        AND p.is_starter = true
+      ORDER BY p.game_box_score_id, p.player_name
+    `, [gameIds, teamName]);
+
+    // Group starters by game
+    const startersByGame = {};
+    for (const row of startersResult.rows) {
+      if (!startersByGame[row.game_box_score_id]) {
+        startersByGame[row.game_box_score_id] = [];
+      }
+      startersByGame[row.game_box_score_id].push({
+        name: row.player_name,
+        id: row.player_id,
+        number: row.uniform_number
+      });
+    }
+
+    // Build lineup records - only process games with exactly 5 starters
+    const lineupMap = {};
+    let gamesWithStarters = 0;
+
+    for (const game of gamesResult.rows) {
+      const starters = startersByGame[game.game_id];
+      if (!starters || starters.length !== 5) continue;
+      
+      gamesWithStarters++;
+      const won = game.team_score > game.opp_score;
+      
+      // Create a consistent lineup key (sorted by player name)
+      const sortedStarters = [...starters].sort((a, b) => a.name.localeCompare(b.name));
+      const lineupKey = sortedStarters.map(s => s.id).join('|');
+      
+      if (!lineupMap[lineupKey]) {
+        lineupMap[lineupKey] = {
+          players: sortedStarters,
+          wins: 0,
+          losses: 0,
+          games: []
+        };
+      }
+      
+      if (won) {
+        lineupMap[lineupKey].wins++;
+      } else {
+        lineupMap[lineupKey].losses++;
+      }
+      
+      lineupMap[lineupKey].games.push({
+        date: game.game_date,
+        opponent: game.opponent,
+        result: won ? 'W' : 'L',
+        score: `${game.team_score}-${game.opp_score}`
+      });
+    }
+
+    // Convert to array and sort by frequency
+    const lineups = Object.values(lineupMap)
+      .map(lineup => ({
+        players: lineup.players,
+        wins: lineup.wins,
+        losses: lineup.losses,
+        gamesStarted: lineup.wins + lineup.losses,
+        winPct: lineup.wins / (lineup.wins + lineup.losses),
+        games: lineup.games
+      }))
+      .sort((a, b) => b.gamesStarted - a.gamesStarted);
+
+    res.json({ lineups, totalGamesWithStarters: gamesWithStarters });
+  } catch (err) {
+    console.error('Error fetching team lineups:', err);
+    res.status(500).json({ error: 'Failed to fetch team lineups' });
+  }
+});
+
+// Get 5-man lineup +/- stats from play-by-play substitution tracking
+router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const { season = DEFAULT_SEASON, source } = req.query;
+
+    // Resolve source from team's league
+    const teamCheck = await pool.query('SELECT name, league FROM teams WHERE team_id = $1 AND season = $2', [teamId, season]);
+    if (!teamCheck.rows.length) return res.status(404).json({ error: 'Team not found' });
+    const teamName = teamCheck.rows[0].name;
+    const league = teamCheck.rows[0].league;
+    const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
+
+    if (!useBoxScore) {
+      return res.json({ lineupStats: [], gamesAnalyzed: 0 });
+    }
+
+    // Get all games for this team
+    const gamesResult = await pool.query(`
+      SELECT id as game_id, home_team_name, away_team_name, home_score, away_score
+      FROM exp_game_box_scores
+      WHERE season = $1 AND league = $2 AND is_exhibition = false
+        AND (home_team_name = $3 OR away_team_name = $3)
+        AND home_score IS NOT NULL
+    `, [season, league, teamName]);
+
+    if (!gamesResult.rows.length) {
+      return res.json({ lineupStats: [], gamesAnalyzed: 0 });
+    }
+
+    const gameIds = gamesResult.rows.map(g => g.game_id);
+    const lineupMap = {}; // key (sorted player IDs) -> stats
+
+    // Process each game
+    for (const game of gamesResult.rows) {
+      const isHome = game.home_team_name === teamName;
+      const teamScore = isHome ? game.home_score : game.away_score;
+      const oppScore = isHome ? game.away_score : game.home_score;
+      
+      // Get play-by-play for this game, ordered by period and time
+      const pbpResult = await pool.query(`
+        SELECT period, game_clock, player_name, action_type, action_text, 
+               is_scoring_play, away_score, home_score, team_name, is_home
+        FROM exp_play_by_play
+        WHERE game_box_score_id = $1
+        ORDER BY period, 
+          CASE WHEN game_clock ~ '^[0-9]+:[0-9]+$' 
+            THEN CAST(SPLIT_PART(game_clock, ':', 1) AS INTEGER) * 60 + CAST(SPLIT_PART(game_clock, ':', 2) AS INTEGER)
+            ELSE 0 END DESC,
+          sequence_number
+      `, [game.game_id]);
+
+      if (!pbpResult.rows.length) continue;
+
+      // Get starters for this game
+      const startersResult = await pool.query(`
+        SELECT player_name, player_id
+        FROM exp_player_game_stats
+        WHERE game_box_score_id = $1 AND team_name = $2 AND is_starter = true
+      `, [game.game_id, teamName]);
+
+      if (startersResult.rows.length !== 5) continue; // Skip games without proper starter data
+
+      // Normalize player name for consistent matching (handles "First Last" vs "LAST,FIRST")
+      const normalizeName = (name) => {
+        if (!name) return '';
+        // Convert to lowercase, remove punctuation, sort parts alphabetically for matching
+        const parts = name.toLowerCase().replace(/[,.'"-]/g, ' ').trim().split(/\s+/).filter(Boolean);
+        return parts.sort().join(' ');
+      };
+
+      // Format name for display (Title Case)
+      const formatDisplayName = (name) => {
+        if (!name) return '';
+        // Handle "LAST,FIRST" format
+        if (name.includes(',')) {
+          const [last, first] = name.split(',').map(s => s.trim());
+          return `${first} ${last}`.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        }
+        // Already "First Last" format
+        return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      };
+
+      // Track current lineup on court
+      const onCourt = new Map(); // normalizedName -> displayName
+      const entryOrder = []; // Track order players entered (for removal)
+      startersResult.rows.forEach(p => {
+        const normalized = normalizeName(p.player_name);
+        const display = formatDisplayName(p.player_name);
+        onCourt.set(normalized, display);
+        entryOrder.push(normalized);
+      });
+
+      let lastTeamScore = 0;
+      let lastOppScore = 0;
+
+      // Process each play
+      for (const play of pbpResult.rows) {
+        // Handle substitutions - only "enters" events exist in the data
+        if (play.action_type === 'substitution' && play.team_name === teamName) {
+          const text = (play.action_text || '').toLowerCase();
+          const playerName = play.player_name;
+          
+          if (text.includes('enters') && playerName) {
+            const normalized = normalizeName(playerName);
+            const display = formatDisplayName(playerName);
+            
+            // If player not already on court, add them
+            if (!onCourt.has(normalized)) {
+              // If we already have 5 players, remove the oldest non-starter
+              if (onCourt.size >= 5 && entryOrder.length > 0) {
+                // Remove the first player in entry order (oldest sub)
+                const playerToRemove = entryOrder.shift();
+                onCourt.delete(playerToRemove);
+              }
+              onCourt.set(normalized, display);
+              entryOrder.push(normalized);
+            }
+          }
+        }
+
+        // Handle scoring plays - attribute to current lineup
+        if (play.is_scoring_play && play.away_score !== null && play.home_score !== null) {
+          const currentTeamScore = isHome ? play.home_score : play.away_score;
+          const currentOppScore = isHome ? play.away_score : play.home_score;
+          
+          const pointsScored = currentTeamScore - lastTeamScore;
+          const pointsAllowed = currentOppScore - lastOppScore;
+          
+          if (pointsScored !== 0 || pointsAllowed !== 0) {
+            // Get current 5-man lineup
+            const lineup = Array.from(onCourt.entries()).slice(0, 5);
+            if (lineup.length === 5) {
+              // Use normalized names for key, display names for output
+              const sortedEntries = lineup.sort((a, b) => a[0].localeCompare(b[0]));
+              const lineupKey = sortedEntries.map(([norm]) => norm).join('|');
+              const displayNames = sortedEntries.map(([, display]) => display);
+              
+              if (!lineupMap[lineupKey]) {
+                lineupMap[lineupKey] = {
+                  players: displayNames,
+                  pointsScored: 0,
+                  pointsAllowed: 0,
+                  possessions: 0 // rough estimate based on scoring plays
+                };
+              }
+              
+              lineupMap[lineupKey].pointsScored += Math.max(0, pointsScored);
+              lineupMap[lineupKey].pointsAllowed += Math.max(0, pointsAllowed);
+              lineupMap[lineupKey].possessions++;
+            }
+          }
+          
+          lastTeamScore = currentTeamScore;
+          lastOppScore = currentOppScore;
+        }
+      }
+    }
+
+    // Convert to array and calculate +/-
+    const lineupStats = Object.values(lineupMap)
+      .map(lineup => ({
+        players: lineup.players,
+        pointsScored: lineup.pointsScored,
+        pointsAllowed: lineup.pointsAllowed,
+        plusMinus: lineup.pointsScored - lineup.pointsAllowed,
+        possessions: lineup.possessions,
+        offRating: lineup.possessions > 0 ? (lineup.pointsScored / lineup.possessions * 100).toFixed(1) : null,
+        defRating: lineup.possessions > 0 ? (lineup.pointsAllowed / lineup.possessions * 100).toFixed(1) : null
+      }))
+      .filter(l => l.possessions >= 2) // Include lineups with at least 2 scoring events
+      .sort((a, b) => b.plusMinus - a.plusMinus);
+
+    res.json({ 
+      lineupStats, // Return all lineups for sortable table
+      gamesAnalyzed: gamesResult.rows.length 
+    });
+  } catch (err) {
+    console.error('Error fetching lineup stats:', err);
+    res.status(500).json({ error: 'Failed to fetch lineup stats' });
+  }
+});
+
 module.exports = router;
