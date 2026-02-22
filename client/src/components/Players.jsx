@@ -117,12 +117,11 @@ const POSITION_OPTIONS = [
 ];
 
 function Players({ league, season, conferences, sourceParam = '' }) {
-  const [players, setPlayers] = useState([]);
-  const [allPlayers, setAllPlayers] = useState([]);
+  const [rawPlayers, setRawPlayers] = useState([]); // All players matching filters (for client-side sort/page)
+  const [allPlayers, setAllPlayers] = useState([]);  // All players for visualizations
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [vizLoading, setVizLoading] = useState(false);
-  const [total, setTotal] = useState(0);
   const [statGroup, setStatGroup] = useState('Overview');
   const [view, setView] = useState('table');
   const [filters, setFilters] = useState({
@@ -162,13 +161,13 @@ function Players({ league, season, conferences, sourceParam = '' }) {
     return teams.filter(t => t.conference === filters.conference);
   }, [teams, filters.conference]);
 
-  // Fetch players when filters/sort change
+  // Fetch all players matching filters (for client-side sort/page)
   const fetchPlayers = useCallback(async () => {
     setLoading(true);
     try {
       let url = `${API_URL}/api/players?league=${league}&season=${season}${sourceParam}`;
-      url += `&sort_by=${sort.key}&sort_order=${sort.dir}`;
-      url += `&limit=${pageSize}&offset=${page * pageSize}`;
+      // Fetch large batch for client-side sorting/pagination
+      url += `&sort_by=pts_pg&sort_order=DESC&limit=5000&offset=0`;
       url += `&min_gp=${filters.minGp}`;
       if (statGroup === 'Clutch') {
         url += `&stat_group=Clutch`;
@@ -189,20 +188,36 @@ function Players({ league, season, conferences, sourceParam = '' }) {
 
       const response = await fetch(url);
       const data = await response.json();
-      setPlayers(data.players || []);
-      setTotal(data.total || 0);
+      setRawPlayers(data.players || []);
     } catch (error) {
       console.error('Error fetching players:', error);
-      setPlayers([]);
-      setTotal(0);
+      setRawPlayers([]);
     } finally {
       setLoading(false);
     }
-  }, [league, season, sort, page, filters, sourceParam, statGroup]);
+  }, [league, season, filters, sourceParam, statGroup]); // Note: sort and page removed from deps
 
   useEffect(() => {
     fetchPlayers();
   }, [fetchPlayers]);
+
+  // Client-side sorting and pagination
+  const players = useMemo(() => {
+    if (!rawPlayers.length) return [];
+    
+    const sorted = [...rawPlayers].sort((a, b) => {
+      const aVal = a[sort.key] ?? (sort.dir === 'DESC' ? -Infinity : Infinity);
+      const bVal = b[sort.key] ?? (sort.dir === 'DESC' ? -Infinity : Infinity);
+      
+      if (sort.dir === 'DESC') {
+        return bVal - aVal;
+      }
+      return aVal - bVal;
+    });
+    
+    const start = page * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [rawPlayers, sort.key, sort.dir, page, pageSize]);
 
   // Fetch all players for visualizations
   const fetchAllPlayers = useCallback(async () => {
@@ -304,7 +319,8 @@ function Players({ league, season, conferences, sourceParam = '' }) {
   const groupConfig = STAT_GROUPS[statGroup];
   const columns = groupConfig?.columns || STAT_GROUPS.Overview.columns;
 
-  const totalPages = Math.ceil(total / pageSize);
+  // Use rawPlayers.length for pagination (client-side)
+  const totalPages = Math.ceil(rawPlayers.length / pageSize);
 
   return (
     <div className="players-page">
@@ -516,7 +532,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
                   Previous
                 </button>
                 <span className="page-info">
-                  Page {page + 1} of {totalPages} ({total} players)
+                  Page {page + 1} of {totalPages} ({rawPlayers.length} players)
                 </span>
                 <button
                   disabled={page >= totalPages - 1}
