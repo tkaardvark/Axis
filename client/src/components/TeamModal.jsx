@@ -310,8 +310,8 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
                       </td>
                       <td className="col-result">
                         {game.is_completed ? (
-                          <span className={`result-${game.result === 'W' ? 'win' : 'loss'}`}>
-                            {game.result}
+                          <span className={`result-${game.result === 'W' ? 'win' : 'loss'}${game.is_forfeit ? ' forfeit' : ''}`}>
+                            {game.result}{game.is_forfeit ? ' (F)' : ''}
                           </span>
                         ) : game.prediction ? (
                           <span className={`result-predicted result-${game.prediction.predicted_result === 'W' ? 'win' : 'loss'}`}>

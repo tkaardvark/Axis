@@ -30,6 +30,7 @@ async function refreshTeamStats(season, league) {
         e.game_date,
         e.away_score as team_score,
         e.home_score as opponent_score,
+        e.forfeit_team_id,
         -- Team stats
         e.away_fgm as fgm, e.away_fga as fga,
         e.away_fgm3 as fgm3, e.away_fga3 as fga3,
@@ -71,6 +72,7 @@ async function refreshTeamStats(season, league) {
         e.game_date,
         e.home_score as team_score,
         e.away_score as opponent_score,
+        e.forfeit_team_id,
         -- Team stats
         e.home_fgm as fgm, e.home_fga as fga,
         e.home_fgm3 as fgm3, e.home_fga3 as fga3,
@@ -108,8 +110,8 @@ async function refreshTeamStats(season, league) {
       SELECT
         team_id,
         COUNT(*) as games_played,
-        SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as wins,
-        SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as losses,
+        SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as wins,
+        SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as losses,
         -- Points
         AVG(team_score) as ppg,
         AVG(opponent_score) as papg,
@@ -153,17 +155,17 @@ async function refreshTeamStats(season, league) {
         AVG(COALESCE(ties, 0)) as avg_ties,
         AVG(COALESCE(largest_lead, 0)) as avg_largest_lead,
         AVG(COALESCE(opp_largest_lead, 0)) as avg_opp_largest_lead,
-        -- Close games (within 5 points)
-        SUM(CASE WHEN ABS(team_score - opponent_score) <= 5 AND team_score > opponent_score THEN 1 ELSE 0 END) as close_wins,
-        SUM(CASE WHEN ABS(team_score - opponent_score) <= 5 AND team_score < opponent_score THEN 1 ELSE 0 END) as close_losses,
+        -- Close games (within 5 points) - use forfeit-aware win logic
+        SUM(CASE WHEN ABS(team_score - opponent_score) <= 5 AND ((forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score)) THEN 1 ELSE 0 END) as close_wins,
+        SUM(CASE WHEN ABS(team_score - opponent_score) <= 5 AND (forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score)) THEN 1 ELSE 0 END) as close_losses,
         -- Blowouts (15+ margin)
         SUM(CASE WHEN team_score - opponent_score >= 15 THEN 1 ELSE 0 END) as blowout_wins,
         SUM(CASE WHEN opponent_score - team_score >= 15 THEN 1 ELSE 0 END) as blowout_losses,
-        -- Leading at halftime
-        SUM(CASE WHEN team_half1_score > opp_half1_score AND team_score > opponent_score THEN 1 ELSE 0 END) as half_lead_wins,
+        -- Leading at halftime - use forfeit-aware win logic
+        SUM(CASE WHEN team_half1_score > opp_half1_score AND ((forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score)) THEN 1 ELSE 0 END) as half_lead_wins,
         SUM(CASE WHEN team_half1_score > opp_half1_score THEN 1 ELSE 0 END) as half_lead_games,
-        -- Comebacks
-        SUM(CASE WHEN team_half1_score < opp_half1_score AND team_score > opponent_score THEN 1 ELSE 0 END) as comeback_wins,
+        -- Comebacks - use forfeit-aware win logic
+        SUM(CASE WHEN team_half1_score < opp_half1_score AND ((forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score)) THEN 1 ELSE 0 END) as comeback_wins,
         SUM(CASE WHEN team_half1_score < opp_half1_score THEN 1 ELSE 0 END) as trailing_half_games
       FROM flat_games
       GROUP BY team_id

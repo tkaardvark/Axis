@@ -111,7 +111,8 @@ router.get('/api/players', async (req, res) => {
     // Map calculated columns to their expressions
     const calculatedColumns = {
       'oreb_pg': 'ROUND(CAST(p.oreb AS DECIMAL) / NULLIF(p.gp, 0), 1)',
-      'dreb_pg': 'ROUND(CAST(p.dreb AS DECIMAL) / NULLIF(p.gp, 0), 1)'
+      'dreb_pg': 'ROUND(CAST(p.dreb AS DECIMAL) / NULLIF(p.gp, 0), 1)',
+      'ast_to_ratio': 'ROUND(CAST(p.ast AS DECIMAL) / NULLIF(p.turnovers, 0), 2)'
     };
 
     const orderByExpr = calculatedColumns[sortColumn]
@@ -126,7 +127,8 @@ router.get('/api/players', async (req, res) => {
         t.logo_url as team_logo_url,
         t.primary_color as team_primary_color,
         ROUND(CAST(p.oreb AS DECIMAL) / NULLIF(p.gp, 0), 1) as oreb_pg,
-        ROUND(CAST(p.dreb AS DECIMAL) / NULLIF(p.gp, 0), 1) as dreb_pg
+        ROUND(CAST(p.dreb AS DECIMAL) / NULLIF(p.gp, 0), 1) as dreb_pg,
+        ROUND(CAST(p.ast AS DECIMAL) / NULLIF(p.turnovers, 0), 2) as ast_to_ratio
       FROM players p
       JOIN teams t ON p.team_id = t.team_id AND p.season = t.season
       WHERE ${whereConditions.join(' AND ')}

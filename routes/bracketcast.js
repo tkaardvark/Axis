@@ -103,7 +103,7 @@ router.get('/api/bracketcast', async (req, res) => {
       totalRecordResult = await pool.query(`
         WITH flat AS (
           SELECT t.team_id,
-            e.away_score as team_score, e.home_score as opponent_score
+            e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
@@ -112,7 +112,7 @@ router.get('/api/bracketcast', async (req, res) => {
             AND ($3::date IS NULL OR e.game_date <= $3::date)
           UNION ALL
           SELECT t.team_id,
-            e.home_score as team_score, e.away_score as opponent_score
+            e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
@@ -121,8 +121,8 @@ router.get('/api/bracketcast', async (req, res) => {
             AND ($3::date IS NULL OR e.game_date <= $3::date)
         )
         SELECT team_id,
-          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as total_wins,
-          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as total_losses
+          SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as total_wins,
+          SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as total_losses
         FROM flat GROUP BY team_id
       `, [league, season, asOfDate]);
     } else {
@@ -159,7 +159,7 @@ router.get('/api/bracketcast', async (req, res) => {
       naiaRecordResult = await pool.query(`
         WITH flat AS (
           SELECT t.team_id,
-            e.away_score as team_score, e.home_score as opponent_score
+            e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
@@ -169,7 +169,7 @@ router.get('/api/bracketcast', async (req, res) => {
             AND ($3::date IS NULL OR e.game_date <= $3::date)
           UNION ALL
           SELECT t.team_id,
-            e.home_score as team_score, e.away_score as opponent_score
+            e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
@@ -179,8 +179,8 @@ router.get('/api/bracketcast', async (req, res) => {
             AND ($3::date IS NULL OR e.game_date <= $3::date)
         )
         SELECT team_id,
-          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as naia_wins,
-          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as naia_losses
+          SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as naia_wins,
+          SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as naia_losses
         FROM flat GROUP BY team_id
       `, [league, season, asOfDate]);
     } else {

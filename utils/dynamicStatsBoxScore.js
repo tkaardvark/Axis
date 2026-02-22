@@ -104,6 +104,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
         (e.away_period_scores->>0)::int as team_half1_score,
         (e.home_period_scores->>0)::int as opp_half1_score,
         e.id as game_box_score_id,
+        e.forfeit_team_id,
         -- Opponent stats (home side)
         e.home_fgm as opp_fgm, e.home_fga as opp_fga,
         e.home_fgm3 as opp_fgm3, e.home_fga3 as opp_fga3,
@@ -151,6 +152,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
         (e.home_period_scores->>0)::int as team_half1_score,
         (e.away_period_scores->>0)::int as opp_half1_score,
         e.id as game_box_score_id,
+        e.forfeit_team_id,
         -- Opponent stats (away side)
         e.away_fgm as opp_fgm, e.away_fga as opp_fga,
         e.away_fgm3 as opp_fgm3, e.away_fga3 as opp_fga3,
@@ -362,8 +364,18 @@ function buildAggregateSelects(alias) {
   const g = alias;
   return `
           COUNT(*) as games_played,
-          SUM(CASE WHEN ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as wins,
-          SUM(CASE WHEN ${g}.team_score < ${g}.opponent_score THEN 1 ELSE 0 END) as losses,
+          SUM(CASE 
+            WHEN ${g}.forfeit_team_id IS NOT NULL THEN 
+              CASE WHEN ${g}.forfeit_team_id = ${g}.team_id THEN 0 ELSE 1 END
+            ELSE 
+              CASE WHEN ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END 
+          END) as wins,
+          SUM(CASE 
+            WHEN ${g}.forfeit_team_id IS NOT NULL THEN 
+              CASE WHEN ${g}.forfeit_team_id = ${g}.team_id THEN 1 ELSE 0 END
+            ELSE 
+              CASE WHEN ${g}.team_score < ${g}.opponent_score THEN 1 ELSE 0 END 
+          END) as losses,
           AVG(${g}.team_score) as points_per_game,
           AVG(${g}.opponent_score) as points_allowed_per_game,
           -- Shooting stats
@@ -490,7 +502,9 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON, le
       -- Extra box score data
       e.ties, e.lead_changes, e.status, e.attendance, e.box_score_url,
       e.away_period_scores as period_scores,
-      e.home_period_scores as opp_period_scores
+      e.home_period_scores as opp_period_scores,
+      e.forfeit_team_id,
+      t.team_id as team_id
     FROM exp_game_box_scores e
     JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
     LEFT JOIN teams opp_t ON opp_t.team_id = e.home_team_id AND opp_t.season = e.season
@@ -538,7 +552,9 @@ async function getBoxScoreGamesForTeam(pool, teamId, season = DEFAULT_SEASON, le
       -- Extra box score data
       e.ties, e.lead_changes, e.status, e.attendance, e.box_score_url,
       e.home_period_scores as period_scores,
-      e.away_period_scores as opp_period_scores
+      e.away_period_scores as opp_period_scores,
+      e.forfeit_team_id,
+      t.team_id as team_id
     FROM exp_game_box_scores e
     JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
     LEFT JOIN teams opp_t ON opp_t.team_id = e.away_team_id AND opp_t.season = e.season
@@ -611,7 +627,7 @@ async function getBoxScorePlayerStats(pool, filters) {
     'fg_pct', 'fg3_pct', 'ft_pct',
     'pts', 'reb', 'ast', 'stl', 'blk', 'gp', 'turnovers',
     'fgm', 'fga', 'fg3m', 'fg3a', 'ftm', 'fta',
-    'oreb', 'dreb',
+    'oreb', 'dreb', 'ast_to_ratio', 'oreb_pg', 'dreb_pg',
   ];
   const sortColumn = validSortColumns.includes(sort_by) ? sort_by : 'pts_pg';
   const order = sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
@@ -656,6 +672,10 @@ async function getBoxScorePlayerStats(pool, filters) {
         ROUND(SUM(p.blk)::numeric / NULLIF(COUNT(*), 0), 1) as blk_pg,
         ROUND(SUM(p.turnovers)::numeric / NULLIF(COUNT(*), 0), 1) as to_pg,
         ROUND(SUM(p.minutes)::numeric / NULLIF(COUNT(*), 0), 1) as min_pg,
+        -- Ratios
+        ROUND(SUM(p.ast)::numeric / NULLIF(SUM(p.turnovers), 0), 2) as ast_to_ratio,
+        ROUND(SUM(p.oreb)::numeric / NULLIF(COUNT(*), 0), 1) as oreb_pg,
+        ROUND(SUM(p.dreb)::numeric / NULLIF(COUNT(*), 0), 1) as dreb_pg,
         -- Percentages
         ROUND(SUM(p.fgm)::numeric / NULLIF(SUM(p.fga), 0), 3) as fg_pct,
         ROUND(SUM(p.fgm3)::numeric / NULLIF(SUM(p.fga3), 0), 3) as fg3_pct,

@@ -439,7 +439,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
       {/* Table */}
       <div className="players-table-wrapper">
         <div className="teams-table-toolbar">
-          <span className="teams-count">{total} players</span>
+          <span className="teams-count">{rawPlayers.length} players</span>
           <button className="export-csv-btn" onClick={() => {
             const csvCols = [
               { key: 'name', label: 'Player' },

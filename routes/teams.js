@@ -7,6 +7,28 @@ const { getConferenceChampions } = require('../utils/conferenceChampions');
 const { getQuadrant } = require('../utils/quadrant');
 const { resolveSource } = require('../utils/dataSource');
 
+// Simple in-memory cache for expensive team stats queries
+const teamsCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(params) {
+  return JSON.stringify(params);
+}
+
+function getCachedTeams(key) {
+  const entry = teamsCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    teamsCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedTeams(key, data) {
+  teamsCache.set(key, { data, timestamp: Date.now() });
+}
+
 // Simple team list for dropdowns (no stats calculations)
 router.get('/api/teams/list', async (req, res) => {
   try {
@@ -37,6 +59,13 @@ router.get('/api/teams', async (req, res) => {
       source,
     } = req.query;
 
+    // Check cache first
+    const cacheKey = getCacheKey({ league, conference, gameType, seasonType, seasonSegment, season, source });
+    const cachedResult = getCachedTeams(cacheKey);
+    if (cachedResult) {
+      return res.json(cachedResult);
+    }
+
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
     const statsFunc = useBoxScore ? calculateDynamicStatsFromBoxScores : calculateDynamicStats;
     const result = await statsFunc(pool, { league, conference, gameType, seasonType, seasonSegment, season });
@@ -49,22 +78,22 @@ router.get('/api/teams', async (req, res) => {
       totalRecordResult = await pool.query(`
         WITH flat AS (
           SELECT t.team_id,
-            e.away_score as team_score, e.home_score as opponent_score
+            e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
           UNION ALL
           SELECT t.team_id,
-            e.home_score as team_score, e.away_score as opponent_score
+            e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
         )
         SELECT team_id,
-          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as total_wins,
-          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as total_losses
+          SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as total_wins,
+          SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as total_losses
         FROM flat GROUP BY team_id
       `, [league, season]);
     } else {
@@ -239,22 +268,22 @@ router.get('/api/teams', async (req, res) => {
         confGamesResult = await pool.query(`
           WITH flat AS (
             SELECT t.team_id,
-              e.away_score as team_score, e.home_score as opponent_score
+              e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
             FROM exp_game_box_scores e
             JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
             WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
               AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
             UNION ALL
             SELECT t.team_id,
-              e.home_score as team_score, e.away_score as opponent_score
+              e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
             FROM exp_game_box_scores e
             JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
             WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
               AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
           )
           SELECT team_id,
-            SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as conf_wins,
-            SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as conf_losses
+            SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as conf_wins,
+            SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as conf_losses
           FROM flat GROUP BY team_id
         `, [league, season]);
       } else {
@@ -403,6 +432,8 @@ router.get('/api/teams', async (req, res) => {
       }
     }
 
+    // Cache the result before sending
+    setCachedTeams(cacheKey, teams);
     res.json(teams);
   } catch (err) {
     console.error('Error fetching teams:', err);
@@ -477,12 +508,19 @@ router.get('/api/teams/:teamId/splits', async (req, res) => {
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
     // Helper to calculate stats for a set of games
-    const calculateSplitStats = (games) => {
+    const calculateSplitStats = (games, teamId) => {
       if (!games || games.length === 0) return null;
 
       const gamesPlayed = games.length;
-      const wins = games.filter(g => g.team_score > g.opponent_score).length;
-      const losses = games.filter(g => g.team_score < g.opponent_score).length;
+      // Handle forfeits: if forfeit_team_id matches teamId, it's a loss; if it matches opponent, it's a win
+      const wins = games.filter(g => 
+        (g.forfeit_team_id && g.forfeit_team_id !== teamId) || 
+        (!g.forfeit_team_id && g.team_score > g.opponent_score)
+      ).length;
+      const losses = games.filter(g => 
+        g.forfeit_team_id === teamId || 
+        (!g.forfeit_team_id && g.team_score < g.opponent_score)
+      ).length;
 
       // Sum up all stats
       const totals = games.reduce((acc, g) => {
@@ -600,42 +638,48 @@ router.get('/api/teams/:teamId/splits', async (req, res) => {
     const splits = [];
 
     // Overall
-    const overallStats = calculateSplitStats(allGames);
+    const overallStats = calculateSplitStats(allGames, teamId);
     if (overallStats) splits.push({ split_name: 'Overall', ...overallStats });
 
     // Conference games
     const confGames = allGames.filter(g => g.is_conference);
-    const confStats = calculateSplitStats(confGames);
+    const confStats = calculateSplitStats(confGames, teamId);
     if (confStats) splits.push({ split_name: 'Conference', ...confStats });
 
     // Last 5 games
     const last5 = allGames.slice(0, 5);
-    const last5Stats = calculateSplitStats(last5);
+    const last5Stats = calculateSplitStats(last5, teamId);
     if (last5Stats) splits.push({ split_name: 'Last 5', ...last5Stats });
 
     // Last 10 games
     const last10 = allGames.slice(0, 10);
-    const last10Stats = calculateSplitStats(last10);
+    const last10Stats = calculateSplitStats(last10, teamId);
     if (last10Stats) splits.push({ split_name: 'Last 10', ...last10Stats });
 
     // Home games
     const homeGames = allGames.filter(g => g.location === 'home');
-    const homeStats = calculateSplitStats(homeGames);
+    const homeStats = calculateSplitStats(homeGames, teamId);
     if (homeStats) splits.push({ split_name: 'Home', ...homeStats });
 
     // Away games
     const awayGames = allGames.filter(g => g.location === 'away');
-    const awayStats = calculateSplitStats(awayGames);
+    const awayStats = calculateSplitStats(awayGames, teamId);
     if (awayStats) splits.push({ split_name: 'Away', ...awayStats });
 
-    // In Wins
-    const winGames = allGames.filter(g => g.team_score > g.opponent_score);
-    const winStats = calculateSplitStats(winGames);
+    // In Wins (accounting for forfeits)
+    const winGames = allGames.filter(g => 
+      (g.forfeit_team_id && g.forfeit_team_id !== teamId) || 
+      (!g.forfeit_team_id && g.team_score > g.opponent_score)
+    );
+    const winStats = calculateSplitStats(winGames, teamId);
     if (winStats) splits.push({ split_name: 'In Wins', ...winStats });
 
-    // In Losses
-    const lossGames = allGames.filter(g => g.team_score < g.opponent_score);
-    const lossStats = calculateSplitStats(lossGames);
+    // In Losses (accounting for forfeits)
+    const lossGames = allGames.filter(g => 
+      g.forfeit_team_id === teamId || 
+      (!g.forfeit_team_id && g.team_score < g.opponent_score)
+    );
+    const lossStats = calculateSplitStats(lossGames, teamId);
     if (lossStats) splits.push({ split_name: 'In Losses', ...lossStats });
 
     res.json({ splits });
@@ -920,6 +964,19 @@ router.get('/api/teams/:teamId/schedule', async (req, res) => {
         };
       }
 
+      // Calculate result accounting for forfeits
+      let result = null;
+      let is_forfeit = false;
+      if (g.is_completed) {
+        if (g.forfeit_team_id) {
+          // If there's a forfeit, check if this team forfeited
+          is_forfeit = true;
+          result = g.forfeit_team_id === g.team_id ? 'L' : 'W';
+        } else {
+          result = g.team_score > g.opponent_score ? 'W' : 'L';
+        }
+      }
+
       return {
         game_id: g.game_id,
         date: g.game_date,
@@ -933,8 +990,9 @@ router.get('/api/teams/:teamId/schedule', async (req, res) => {
         is_naia_game: g.is_naia_game,
         is_exhibition: g.is_exhibition,
         is_completed: g.is_completed,
+        is_forfeit,
         game_type: gameType,
-        result: g.is_completed ? (g.team_score > g.opponent_score ? 'W' : 'L') : null,
+        result,
         quadrant,
         opponent_rpi_rank: oppRpiRank,
         prediction
@@ -1070,19 +1128,22 @@ router.get('/api/teams/:teamId/lineups', async (req, res) => {
         g.game_date,
         g.home_team_name,
         g.away_team_name,
+        g.home_team_id,
+        g.away_team_id,
         g.home_score,
         g.away_score,
-        CASE WHEN g.home_team_name = $1 THEN g.home_score ELSE g.away_score END as team_score,
-        CASE WHEN g.home_team_name = $1 THEN g.away_score ELSE g.home_score END as opp_score,
-        CASE WHEN g.home_team_name = $1 THEN g.away_team_name ELSE g.home_team_name END as opponent
+        g.forfeit_team_id,
+        CASE WHEN g.home_team_id = $1 THEN g.home_score ELSE g.away_score END as team_score,
+        CASE WHEN g.home_team_id = $1 THEN g.away_score ELSE g.home_score END as opp_score,
+        CASE WHEN g.home_team_id = $1 THEN g.away_team_name ELSE g.home_team_name END as opponent
       FROM exp_game_box_scores g
       WHERE g.season = $2 
         AND g.league = $3
         AND g.is_exhibition = false
-        AND (g.home_team_name = $1 OR g.away_team_name = $1)
+        AND (g.home_team_id = $1 OR g.away_team_id = $1)
         AND g.home_score IS NOT NULL
       ORDER BY g.game_date
-    `, [teamName, season, league]);
+    `, [teamId, season, league]);
 
     if (!gamesResult.rows.length) {
       return res.json({ lineups: [], totalGamesWithStarters: 0 });
@@ -1125,7 +1186,10 @@ router.get('/api/teams/:teamId/lineups', async (req, res) => {
       if (!starters || starters.length !== 5) continue;
       
       gamesWithStarters++;
-      const won = game.team_score > game.opp_score;
+      // Forfeit-aware win determination
+      const won = game.forfeit_team_id 
+        ? game.forfeit_team_id !== teamId  // If there's a forfeit, team wins if they didn't forfeit
+        : game.team_score > game.opp_score;
       
       // Create a consistent lineup key (sorted by player name)
       const sortedStarters = [...starters].sort((a, b) => a.name.localeCompare(b.name));
@@ -1150,6 +1214,7 @@ router.get('/api/teams/:teamId/lineups', async (req, res) => {
         date: game.game_date,
         opponent: game.opponent,
         result: won ? 'W' : 'L',
+        is_forfeit: !!game.forfeit_team_id,
         score: `${game.team_score}-${game.opp_score}`
       });
     }

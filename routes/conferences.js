@@ -265,17 +265,17 @@ router.get('/api/conferences/:conference/summary', async (req, res) => {
     const nonConfRecordCte = useBoxScore ? `
       non_conf_record AS (
         SELECT
-          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as nc_wins,
-          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as nc_losses
+          SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as nc_wins,
+          SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as nc_losses
         FROM (
-          SELECT e.away_score as team_score, e.home_score as opponent_score
+          SELECT ct.team_id, e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN conf_teams ct ON e.away_team_id = ct.team_id
           WHERE e.season = $3 AND COALESCE(e.is_naia_game, false) = true
             AND e.is_conference = false AND e.is_exhibition = false
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
           UNION ALL
-          SELECT e.home_score as team_score, e.away_score as opponent_score
+          SELECT ct.team_id, e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN conf_teams ct ON e.home_team_id = ct.team_id
           WHERE e.season = $3 AND COALESCE(e.is_naia_game, false) = true
@@ -491,10 +491,10 @@ router.get('/api/conference-rankings', async (req, res) => {
     const nonConfCte = useBoxScore ? `
       non_conf AS (
         SELECT conference,
-          SUM(CASE WHEN team_score > opponent_score THEN 1 ELSE 0 END) as nc_wins,
-          SUM(CASE WHEN team_score < opponent_score THEN 1 ELSE 0 END) as nc_losses
+          SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as nc_wins,
+          SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as nc_losses
         FROM (
-          SELECT t.conference, e.away_score as team_score, e.home_score as opponent_score
+          SELECT t.team_id, t.conference, e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
           WHERE t.league = $1 AND t.season = $2 AND t.is_excluded = FALSE
@@ -502,7 +502,7 @@ router.get('/api/conference-rankings', async (req, res) => {
             AND e.is_conference = false AND e.is_exhibition = false
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
           UNION ALL
-          SELECT t.conference, e.home_score as team_score, e.away_score as opponent_score
+          SELECT t.team_id, t.conference, e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
           WHERE t.league = $1 AND t.season = $2 AND t.is_excluded = FALSE
