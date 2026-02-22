@@ -576,7 +576,7 @@ async function getBoxScorePlayerStats(pool, filters) {
     min_gp = 5,
   } = filters;
 
-  let whereConditions = ['t.league = $1', 'p.season = $2', 't.is_excluded = FALSE'];
+  let whereConditions = ['g.league = $1', 'p.season = $2', 't.is_excluded = FALSE'];
   let params = [league, season];
   let paramIndex = 3;
 
@@ -662,7 +662,7 @@ async function getBoxScorePlayerStats(pool, filters) {
         ROUND(SUM(p.ftm)::numeric / NULLIF(SUM(p.fta), 0), 3) as ft_pct
       FROM exp_player_game_stats p
       JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
-      JOIN teams t ON t.name = p.team_name AND t.season = p.season
+      JOIN teams t ON t.name = p.team_name AND t.season = p.season AND t.league = g.league
       LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = p.season
       WHERE ${whereConditions.join(' AND ')} AND g.is_exhibition = false
       GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, pl.position, pl.year
@@ -682,7 +682,7 @@ async function getBoxScorePlayerStats(pool, filters) {
       SELECT p.player_id
       FROM exp_player_game_stats p
       JOIN exp_game_box_scores g ON g.id = p.game_box_score_id
-      JOIN teams t ON t.name = p.team_name AND t.season = p.season
+      JOIN teams t ON t.name = p.team_name AND t.season = p.season AND t.league = g.league
       LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = p.season
       WHERE ${whereConditions.join(' AND ')} AND g.is_exhibition = false
       GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, pl.position, pl.year
@@ -861,7 +861,7 @@ async function getClutchPlayerStats(pool, filters) {
         ROUND(pc.clutch_to::numeric / NULLIF(pc.clutch_games, 0), 1) as clutch_to_pg,
         pc.clutch_blk
       FROM player_clutch pc
-      JOIN teams t ON t.name = pc.team_name AND t.season = pc.season
+      JOIN teams t ON t.name = pc.team_name AND t.season = pc.season AND t.league = $1
       LEFT JOIN overall ov ON UPPER(ov.player_name) = UPPER(pc.player_name_normal)
         AND ov.team_name = pc.team_name AND ov.season = pc.season
       LEFT JOIN players pl ON pl.player_id = ov.player_id AND pl.season = pc.season
@@ -911,7 +911,7 @@ async function getClutchPlayerStats(pool, filters) {
     SELECT COUNT(*) as total FROM (
       SELECT pc.pbp_name
       FROM player_clutch pc
-      JOIN teams t ON t.name = pc.team_name AND t.season = pc.season
+      JOIN teams t ON t.name = pc.team_name AND t.season = pc.season AND t.league = $1
       LEFT JOIN overall ov ON UPPER(ov.player_name) = UPPER(pc.player_name_normal)
         AND ov.team_name = pc.team_name AND ov.season = pc.season
       LEFT JOIN players pl ON pl.player_id = ov.player_id AND pl.season = pc.season
