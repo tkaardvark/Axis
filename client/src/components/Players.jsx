@@ -136,11 +136,11 @@ function Players({ league, season, conferences, sourceParam = '' }) {
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
-  // Fetch teams for dropdown
+  // Fetch teams for dropdown (using fast list endpoint)
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-        const url = `${API_URL}/api/teams?league=${league}&season=${season}${sourceParam}`;
+        const url = `${API_URL}/api/teams/list?league=${league}&season=${season}`;
         const response = await fetch(url);
         const data = await response.json();
         // Sort teams alphabetically by name
@@ -154,7 +154,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
       }
     };
     fetchTeams();
-  }, [league, season, sourceParam]);
+  }, [league, season]);
 
   // Filter teams based on selected conference
   const filteredTeams = useMemo(() => {

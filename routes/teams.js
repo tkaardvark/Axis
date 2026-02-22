@@ -7,6 +7,23 @@ const { getConferenceChampions } = require('../utils/conferenceChampions');
 const { getQuadrant } = require('../utils/quadrant');
 const { resolveSource } = require('../utils/dataSource');
 
+// Simple team list for dropdowns (no stats calculations)
+router.get('/api/teams/list', async (req, res) => {
+  try {
+    const { league = 'mens', season = DEFAULT_SEASON } = req.query;
+    const result = await pool.query(`
+      SELECT team_id, name, conference, logo_url
+      FROM teams
+      WHERE league = $1 AND season = $2
+      ORDER BY name
+    `, [league, season]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching teams list:', err);
+    res.status(500).json({ error: 'Failed to fetch teams list' });
+  }
+});
+
 // Get team stats with filters - always calculate dynamically from games
 router.get('/api/teams', async (req, res) => {
   try {
