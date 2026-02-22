@@ -154,7 +154,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
       }
     };
     fetchTeams();
-  }, [league, season]);
+  }, [league, season, sourceParam]);
 
   // Filter teams based on selected conference
   const filteredTeams = useMemo(() => {
