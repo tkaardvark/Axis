@@ -83,7 +83,7 @@
 }
 
 /* Data source toggle */
-.source-toggle {
+.source-indicator {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -92,40 +92,29 @@
   border: 1px solid var(--color-border-primary);
   border-radius: 18px;
   background: transparent;
-  cursor: pointer;
   color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 500;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
   white-space: nowrap;
 }
 
-.source-toggle:hover {
-  background-color: var(--color-bg-hover);
-  border-color: var(--color-text-tertiary);
-}
-
-.source-toggle.active {
+.source-indicator.boxscore {
   background-color: var(--color-accent, #2563eb);
   border-color: var(--color-accent, #2563eb);
   color: #fff;
 }
 
-.source-toggle.active:hover {
-  opacity: 0.9;
-}
-
-.source-toggle.legacy {
+.source-indicator.legacy {
   background-color: var(--color-bg-hover);
   border-color: var(--color-text-tertiary);
   color: var(--color-text-secondary);
 }
 
-.source-toggle svg {
+.source-indicator svg {
   flex-shrink: 0;
 }
 
-.source-toggle-label {
+.source-indicator-label {
   line-height: 1;
 }
 
@@ -305,11 +294,11 @@
     height: 18px;
   }
 
-  .source-toggle-label {
+  .source-indicator-label {
     display: none;
   }
 
-  .source-toggle {
+  .source-indicator {
     padding: 0 8px;
     height: 32px;
   }

@@ -29,11 +29,10 @@ const DEFAULTS = {
   seasonSegment: 'all',
   statGroup: 'Efficiency',
   view: 'table',
-  source: 'auto',
 };
 
 // Seasons + leagues with boxscore data available (mirrors backend BOXSCORE_AVAILABLE)
-const BOXSCORE_AVAILABLE = new Set(['mens:2025-26']);
+const BOXSCORE_AVAILABLE = new Set(['mens:2025-26', 'womens:2025-26']);
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,15 +48,9 @@ function App() {
   const vizFilter = searchParams.get('vizFilter') || 'net50';
   const statGroup = searchParams.get('statGroup') || DEFAULTS.statGroup;
   const view = searchParams.get('view') || DEFAULTS.view;
-  const source = searchParams.get('source') || DEFAULTS.source;
 
-  // Resolve effective source: 'auto' lets server decide, 'legacy' forces legacy
-  const effectiveSource = source === 'legacy' ? 'legacy'
-    : source === 'boxscore' ? 'boxscore'
-    : BOXSCORE_AVAILABLE.has(`${league}:${season}`) ? 'boxscore' : 'legacy';
-
-  // Only send explicit source param when overriding (legacy forces legacy, auto lets server decide)
-  const sourceParam = source === 'legacy' ? '&source=legacy' : '';
+  // Determine data source by season: 2025-26 uses boxscore, older seasons use legacy
+  const sourceParam = BOXSCORE_AVAILABLE.has(`${league}:${season}`) ? '' : '&source=legacy';
 
   const [teams, setTeams] = useState([]);
   const [conferences, setConferences] = useState([]);
@@ -98,7 +91,6 @@ function App() {
   const setSeason = useCallback((value) => updateParams({ season: value }), [updateParams]);
   const setStatGroup = useCallback((value) => updateParams({ statGroup: value }), [updateParams]);
   const setView = useCallback((value) => updateParams({ view: value }), [updateParams]);
-  const setSource = useCallback((value) => updateParams({ source: value }), [updateParams]);
 
   const setFilters = useCallback((updater) => {
     if (typeof updater === 'function') {
@@ -348,9 +340,6 @@ function App() {
         activePage={currentPage}
         onPageChange={setCurrentPage}
         hasPlayers={hasPlayers}
-        source={source}
-        effectiveSource={effectiveSource}
-        onSourceChange={setSource}
       />
       <main id="main-content" className="main-content">
         {error && (

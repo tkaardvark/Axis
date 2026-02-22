@@ -3,7 +3,7 @@ import logoSrc from '../assets/logo.svg';
 import logoDarkSrc from '../assets/logo-dark.svg';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 
-function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange, lastUpdated, hasPlayers, source, effectiveSource, onSourceChange }) {
+function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange, lastUpdated, hasPlayers }) {
   const { theme, toggleTheme } = useTheme();
 
   const formatLastUpdated = (dateStr) => {
@@ -40,12 +40,10 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
         </div>
 
         <div className="header-right">
-          {onSourceChange && (
-            <button
-              className={`source-toggle${source === 'legacy' ? ' legacy' : ' active'}`}
-              onClick={() => onSourceChange(source === 'legacy' ? 'auto' : 'legacy')}
-              aria-label={source === 'legacy' ? 'Switch back to auto data source' : 'Force legacy data source'}
-              title={effectiveSource === 'boxscore' ? 'Using Box Score data (click for legacy)' : 'Using Legacy data'}
+          {season && (
+            <span
+              className={`source-indicator${season === '2025-26' ? ' boxscore' : ' legacy'}`}
+              title={season === '2025-26' ? 'Using Box Score data source' : 'Using Legacy data source'}
             >
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
                 <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
@@ -54,8 +52,8 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
                 <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" strokeWidth="2"/>
                 <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="2"/>
               </svg>
-              <span className="source-toggle-label">{effectiveSource === 'boxscore' ? 'Box Score' : 'Legacy'}</span>
-            </button>
+              <span className="source-indicator-label">{season === '2025-26' ? 'Box Score' : 'Legacy'}</span>
+            </span>
           )}
           <button
             className="theme-toggle"
