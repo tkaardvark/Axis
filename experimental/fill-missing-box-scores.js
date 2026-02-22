@@ -33,6 +33,7 @@ const {
 } = require('./scrape-scoreboard');
 const { parseBoxScore } = require('./parse-box-score');
 const { insertBoxScore, markNaiaGames } = require('./import-box-scores');
+const { refreshTeamStats } = require('../utils/refreshTeamStats');
 
 // Parse CLI args
 const args = process.argv.slice(2);
@@ -416,9 +417,10 @@ async function fillMissingBoxScores(options = {}) {
     }
     console.log('═══════════════════════════════════════════════════════');
 
-    // Post-import: mark NAIA games
+    // Post-import: mark NAIA games and refresh stats
     if (!dryRun && summary.imported > 0) {
       await markNaiaGames(season);
+      await refreshTeamStats(season, league);
     }
 
     return summary;

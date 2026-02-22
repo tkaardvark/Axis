@@ -16,6 +16,7 @@ const { Client } = require('pg');
 const https = require('https');
 const fs = require('fs');
 const excludedTeamsConfig = require('./config/excluded-teams');
+const { refreshTeamStats } = require('./utils/refreshTeamStats');
 
 // Parse --season argument (default: 2025-26)
 const args = process.argv.slice(2);
@@ -1016,6 +1017,11 @@ async function main() {
   } finally {
     await client.end();
   }
+
+  // Refresh box score derived stats for both leagues
+  console.log('\nRefreshing box score derived stats...');
+  await refreshTeamStats(SEASON, 'mens');
+  await refreshTeamStats(SEASON, 'womens');
   
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   
