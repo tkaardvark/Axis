@@ -199,7 +199,7 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
             <div className="modal-record">
               <span className="record-label">NAIA Record</span>
               <span className="record-value">
-                {overallSplit ? `${overallSplit.wins}-${overallSplit.losses}` : '-'}
+                {team.naia_wins !== undefined ? `${team.naia_wins}-${team.naia_losses}` : '-'}
               </span>
             </div>
             <div className="modal-record">

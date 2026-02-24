@@ -539,7 +539,7 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
               <div className="scout-record">
                 <span className="record-label">NAIA Record</span>
                 <span className="record-value">
-                  {overallSplit ? `${overallSplit.wins}-${overallSplit.losses}` : '-'}
+                  {selectedTeam.naia_wins !== undefined ? `${selectedTeam.naia_wins}-${selectedTeam.naia_losses}` : '-'}
                 </span>
               </div>
               <div className="scout-record">

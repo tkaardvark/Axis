@@ -1,17 +1,22 @@
 /**
  * Experimental: Fill Missing Box Scores
  *
- * Discovers box score URLs from team game log pages that were missed by
+ * Discovers box score URLs from the S3 team JSON data that were missed by
  * the scoreboard scraper (some games on the scoreboard lack box score XML
- * links even though the XML exists on team pages).
+ * links even though the XML exists).
  *
  * Strategy:
- *   1. Scrape the stats page to get all team slugs
- *   2. For each team, fetch their game log page and extract box score URLs
+ *   1. Read team S3 JSON URLs from team-urls-{season}.json
+ *   2. For each team, fetch S3 JSON and extract boxScoreLink values
  *   3. Deduplicate across all teams
  *   4. Compare against existing DB records
  *   5. Import any missing box scores
  *   6. Log discoveries to box_score_import_log table
+ *
+ * Note: Previously scraped HTML team gamelog pages for box score links,
+ * but Presto Sports now renders those pages client-side with JavaScript,
+ * so the static HTML contains no box score URLs. The S3 JSON approach
+ * is reliable and provides the same data.
  *
  * Usage:
  *   node experimental/fill-missing-box-scores.js
@@ -25,6 +30,9 @@
 
 require('dotenv').config();
 const { Pool } = require('pg');
+const https = require('https');
+const path = require('path');
+const fs = require('fs');
 const {
   fetchPage,
   fetchBoxScoreHtml,
@@ -75,7 +83,75 @@ function getDateStringET(offsetDays = 0) {
 }
 
 /**
- * Get all team slugs from the stats page
+ * Fetch JSON from an S3 URL
+ */
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchJson(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+      }
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error(`Failed to parse JSON from ${url}: ${e.message}`));
+        }
+      });
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+/**
+ * Get all team S3 JSON URLs from team-urls-{season}.json
+ */
+function getTeamS3Urls(league, season) {
+  const filename = `team-urls-${season}.json`;
+  const filePath = path.join(__dirname, '..', filename);
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Team URLs file not found: ${filename}. Run scrape-team-urls.js first.`);
+  }
+
+  const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return data[league] || [];
+}
+
+/**
+ * Get all box score filenames from a team's S3 JSON data.
+ * Returns array of filenames like "20251115_8vaz.xml".
+ * Only includes events with status "Final" (completed games).
+ */
+async function getBoxScoreUrlsFromS3(s3Url) {
+  const json = await fetchJson(s3Url);
+  const teamName = json.attributes?.school_name || 'Unknown';
+  const events = json.events || [];
+
+  const urls = [];
+  for (const eventData of events) {
+    const bsl = eventData.boxScoreLink;
+    if (!bsl) continue;
+
+    // Only include completed games (status starts with "Final")
+    const status = eventData.event?.status || '';
+    if (!status.startsWith('Final')) continue;
+
+    urls.push(bsl);
+  }
+
+  return { teamName, urls };
+}
+
+/**
+ * Get all team slugs from the stats page (legacy — kept for backward compat)
+ * NOTE: Team page HTML scraping no longer works because Presto Sports
+ * pages are now rendered client-side with JavaScript.
  */
 async function getTeamSlugs(league, season) {
   const sport = LEAGUE_PATHS[league];
@@ -99,6 +175,8 @@ async function getTeamSlugs(league, season) {
 
 /**
  * Get all box score URLs from a team's game log page.
+ * NOTE: BROKEN — Presto Sports team pages are now JS-rendered.
+ * Use getBoxScoreUrlsFromS3() instead.
  * Returns array of filenames like "20251115_8vaz.xml".
  */
 async function getBoxScoreUrlsFromTeamPage(teamSlug, league, season) {
@@ -266,31 +344,31 @@ async function fillMissingBoxScores(options = {}) {
   }
 
   console.log('═══════════════════════════════════════════════════════');
-  console.log('  Fill Missing Box Scores (Team Page Discovery)');
+  console.log('  Fill Missing Box Scores (S3 JSON Discovery)');
   console.log(`  Season: ${season} | League: ${league}`);
   if (lookbackDays) console.log(`  Lookback: last ${lookbackDays} days (since ${cutoffDate})`);
   if (dryRun) console.log('  🔍 DRY RUN — no database writes');
   console.log('═══════════════════════════════════════════════════════\n');
 
   try {
-    // Step 1: Get all team slugs
-    const teamSlugs = await getTeamSlugs(league, season);
-    console.log(`Found ${teamSlugs.length} teams\n`);
+    // Step 1: Get all team S3 JSON URLs
+    const teamUrls = getTeamS3Urls(league, season);
+    console.log(`Found ${teamUrls.length} team S3 URLs for ${league}\n`);
 
-    // Step 2: Scrape all team game logs for box score URLs
-    console.log('Scraping team game logs for box score URLs...');
+    // Step 2: Fetch all team JSONs and collect box score URLs
+    console.log('Fetching team S3 data for box score URLs...');
     const allBoxScoreFiles = new Set();
 
-    for (let i = 0; i < teamSlugs.length; i += concurrency) {
-      const batch = teamSlugs.slice(i, i + concurrency);
+    for (let i = 0; i < teamUrls.length; i += concurrency) {
+      const batch = teamUrls.slice(i, i + concurrency);
       const results = await Promise.allSettled(
-        batch.map(slug => getBoxScoreUrlsFromTeamPage(slug, league, season))
+        batch.map(url => getBoxScoreUrlsFromS3(url))
       );
 
       for (let j = 0; j < results.length; j++) {
         const r = results[j];
         if (r.status === 'fulfilled') {
-          for (const file of r.value) {
+          for (const file of r.value.urls) {
             // If lookback is set, filter by date
             if (cutoffDate) {
               const fileDate = dateFromFilename(file);
@@ -300,22 +378,22 @@ async function fillMissingBoxScores(options = {}) {
           }
           summary.teamsScraped++;
         } else {
-          console.log(`  ⚠️  Failed to scrape ${batch[j]}: ${r.reason?.message}`);
+          console.log(`  ⚠️  Failed to fetch ${batch[j]}: ${r.reason?.message}`);
         }
       }
 
       // Progress update every 30 teams
       if ((i + concurrency) % 30 < concurrency) {
-        console.log(`  ${summary.teamsScraped}/${teamSlugs.length} teams scraped, ${allBoxScoreFiles.size} unique box scores found...`);
+        console.log(`  ${summary.teamsScraped}/${teamUrls.length} teams fetched, ${allBoxScoreFiles.size} unique box scores found...`);
       }
 
-      if (i + concurrency < teamSlugs.length) {
+      if (i + concurrency < teamUrls.length) {
         await sleep(delay);
       }
     }
 
     summary.totalOnPages = allBoxScoreFiles.size;
-    console.log(`\nScraped ${summary.teamsScraped} teams → ${allBoxScoreFiles.size} unique box score files\n`);
+    console.log(`\nFetched ${summary.teamsScraped} teams → ${allBoxScoreFiles.size} unique box score files\n`);
 
     // Step 3: Get existing box score URLs from DB
     console.log('Querying database for existing box scores...');
@@ -405,7 +483,7 @@ async function fillMissingBoxScores(options = {}) {
     // Summary
     console.log('\n═══════════════════════════════════════════════════════');
     console.log('  Gap Fill Complete');
-    console.log(`  Teams scraped:       ${summary.teamsScraped}`);
+    console.log(`  Teams fetched:       ${summary.teamsScraped}`);
     console.log(`  Box scores on pages: ${summary.totalOnPages}`);
     console.log(`  Already in DB:       ${summary.alreadyInDb}`);
     console.log(`  Missing found:       ${summary.missingFound}`);
@@ -458,7 +536,9 @@ if (require.main === module) {
 
 module.exports = {
   getTeamSlugs,
+  getTeamS3Urls,
   getBoxScoreUrlsFromTeamPage,
+  getBoxScoreUrlsFromS3,
   dateFromFilename,
   fillMissingBoxScores,
   logImport,

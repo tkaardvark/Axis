@@ -105,6 +105,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
         (e.home_period_scores->>0)::int as opp_half1_score,
         e.id as game_box_score_id,
         e.forfeit_team_id,
+        COALESCE(e.is_naia_game, false) as is_naia_game,
         -- Opponent stats (home side)
         e.home_fgm as opp_fgm, e.home_fga as opp_fga,
         e.home_fgm3 as opp_fgm3, e.home_fga3 as opp_fga3,
@@ -153,6 +154,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
         (e.away_period_scores->>0)::int as opp_half1_score,
         e.id as game_box_score_id,
         e.forfeit_team_id,
+        COALESCE(e.is_naia_game, false) as is_naia_game,
         -- Opponent stats (away side)
         e.away_fgm as opp_fgm, e.away_fga as opp_fga,
         e.away_fgm3 as opp_fgm3, e.away_fga3 as opp_fga3,
@@ -219,9 +221,9 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
       gs.wins::int,
       gs.losses::int,
       ROUND(CASE WHEN gs.games_played > 0 THEN gs.wins::float / gs.games_played ELSE 0 END::numeric, 3) as win_pct,
-      gs.wins::int as naia_wins,
-      gs.losses::int as naia_losses,
-      ROUND(CASE WHEN gs.games_played > 0 THEN gs.wins::float / gs.games_played ELSE 0 END::numeric, 3) as naia_win_pct,
+      gs.naia_wins::int as naia_wins,
+      gs.naia_losses::int as naia_losses,
+      ROUND(CASE WHEN (gs.naia_wins + gs.naia_losses) > 0 THEN gs.naia_wins::float / (gs.naia_wins + gs.naia_losses) ELSE 0 END::numeric, 3) as naia_win_pct,
       ROUND(gs.points_per_game::numeric, 1) as points_per_game,
       ROUND(gs.points_allowed_per_game::numeric, 1) as points_allowed_per_game,
       -- Offensive rating
@@ -376,6 +378,24 @@ function buildAggregateSelects(alias) {
             ELSE 
               CASE WHEN ${g}.team_score < ${g}.opponent_score THEN 1 ELSE 0 END 
           END) as losses,
+          -- NAIA-only wins (games where is_naia_game = true)
+          SUM(CASE WHEN ${g}.is_naia_game THEN
+            CASE 
+              WHEN ${g}.forfeit_team_id IS NOT NULL THEN 
+                CASE WHEN ${g}.forfeit_team_id = ${g}.team_id THEN 0 ELSE 1 END
+              ELSE 
+                CASE WHEN ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END 
+            END
+          ELSE 0 END) as naia_wins,
+          -- NAIA-only losses
+          SUM(CASE WHEN ${g}.is_naia_game THEN
+            CASE 
+              WHEN ${g}.forfeit_team_id IS NOT NULL THEN 
+                CASE WHEN ${g}.forfeit_team_id = ${g}.team_id THEN 1 ELSE 0 END
+              ELSE 
+                CASE WHEN ${g}.team_score < ${g}.opponent_score THEN 1 ELSE 0 END 
+            END
+          ELSE 0 END) as naia_losses,
           AVG(${g}.team_score) as points_per_game,
           AVG(${g}.opponent_score) as points_allowed_per_game,
           -- Shooting stats
