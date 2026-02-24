@@ -63,6 +63,8 @@ async function refreshTeamStats(season, league) {
       FROM exp_game_box_scores e
       JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
       WHERE e.season = $1 AND t.league = $2 AND t.is_excluded = FALSE
+        AND e.is_exhibition = false
+        AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
 
       UNION ALL
 
@@ -105,6 +107,8 @@ async function refreshTeamStats(season, league) {
       FROM exp_game_box_scores e
       JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
       WHERE e.season = $1 AND t.league = $2 AND t.is_excluded = FALSE
+        AND e.is_exhibition = false
+        AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
     ),
     game_stats AS (
       SELECT

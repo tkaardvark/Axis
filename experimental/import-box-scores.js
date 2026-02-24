@@ -102,6 +102,23 @@ async function insertBoxScore(parsed) {
   const client = await pool.connect();
   try {
     const { game, players, plays } = parsed;
+
+    // Fallback: resolve null team IDs by matching name to teams table
+    if (!game.away.id && game.away.name) {
+      const r = await client.query(
+        `SELECT team_id FROM teams WHERE name = $1 AND season = $2 AND league = $3 LIMIT 1`,
+        [game.away.name, game.season, game.league]
+      );
+      if (r.rows.length > 0) game.away.id = r.rows[0].team_id;
+    }
+    if (!game.home.id && game.home.name) {
+      const r = await client.query(
+        `SELECT team_id FROM teams WHERE name = $1 AND season = $2 AND league = $3 LIMIT 1`,
+        [game.home.name, game.season, game.league]
+      );
+      if (r.rows.length > 0) game.home.id = r.rows[0].team_id;
+    }
+
     const awayTotals = game.away.totals || {};
     const homeTotals = game.home.totals || {};
     const awayTeamStats = game.away.teamStats || {};
