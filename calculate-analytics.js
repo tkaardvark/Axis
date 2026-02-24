@@ -92,6 +92,94 @@ function isExcludedTeam(name, league = null) {
 }
 
 // ============================================================================
+// FORFEIT HANDLING
+// ============================================================================
+
+/**
+ * Fetch all forfeits from the database
+ * Returns a Map: key = "YYYY-MM-DD|teamId" -> forfeitTeamId
+ */
+async function fetchForfeits(season) {
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  
+  try {
+    await client.connect();
+    const result = await client.query(`
+      SELECT game_date, away_team_id, home_team_id, forfeit_team_id
+      FROM exp_game_box_scores
+      WHERE season = $1 AND forfeit_team_id IS NOT NULL
+    `, [season]);
+    
+    // Create lookup maps:
+    // 1. For the forfeiting team's games
+    // 2. For the opponent's games (they get a win)
+    const forfeitMap = new Map();
+    
+    for (const row of result.rows) {
+      const dateStr = row.game_date.toISOString().split('T')[0];
+      const forfeitTeamId = row.forfeit_team_id;
+      
+      // For the forfeiting team: they lose this game
+      if (row.away_team_id === forfeitTeamId) {
+        forfeitMap.set(`${dateStr}|${row.away_team_id}|${row.home_team_id}`, 'away_forfeit');
+        if (row.home_team_id) {
+          forfeitMap.set(`${dateStr}|${row.home_team_id}|${row.away_team_id}`, 'home_wins');
+        }
+      } else if (row.home_team_id === forfeitTeamId) {
+        forfeitMap.set(`${dateStr}|${row.home_team_id}|${row.away_team_id}`, 'home_forfeit');
+        if (row.away_team_id) {
+          forfeitMap.set(`${dateStr}|${row.away_team_id}|${row.home_team_id}`, 'away_wins');
+        }
+      }
+    }
+    
+    console.log(`  Loaded ${result.rows.length} forfeited games`);
+    return forfeitMap;
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Apply forfeit adjustments to team games
+ * Flips isWin for forfeited games
+ */
+function applyForfeitAdjustments(allTeamGames, forfeitMap) {
+  let adjustments = 0;
+  
+  for (const [teamId, games] of Object.entries(allTeamGames)) {
+    for (const game of games) {
+      if (!game.date || !game.opponentId) continue;
+      
+      const dateStr = game.date.toISOString().split('T')[0];
+      const key = `${dateStr}|${teamId}|${game.opponentId}`;
+      const forfeitStatus = forfeitMap.get(key);
+      
+      if (forfeitStatus) {
+        if (forfeitStatus === 'away_forfeit' || forfeitStatus === 'home_forfeit') {
+          // This team forfeited - they lose regardless of score
+          if (game.isWin) {
+            game.isWin = false;
+            adjustments++;
+          }
+        } else if (forfeitStatus === 'away_wins' || forfeitStatus === 'home_wins') {
+          // Opponent forfeited - this team wins
+          if (!game.isWin) {
+            game.isWin = true;
+            adjustments++;
+          }
+        }
+      }
+    }
+  }
+  
+  return adjustments;
+}
+
+// ============================================================================
 // GAME FILTERING
 // ============================================================================
 
@@ -921,6 +1009,25 @@ async function main() {
   for (const team of allTeams) {
     allTeamMetrics[team.teamId] = team.metrics;
     allTeamGames[team.teamId] = team.games;
+  }
+  
+  // Apply forfeit adjustments BEFORE calculating metrics
+  console.log('\n⚠️  APPLYING FORFEIT ADJUSTMENTS');
+  console.log('-'.repeat(40));
+  const forfeitMap = await fetchForfeits(SEASON);
+  const forfeitAdjustments = applyForfeitAdjustments(allTeamGames, forfeitMap);
+  console.log(`  Applied ${forfeitAdjustments} win/loss adjustments due to forfeits`);
+  
+  // Recalculate metrics for teams affected by forfeits
+  if (forfeitAdjustments > 0) {
+    console.log('  Recalculating metrics for affected teams...');
+    for (const team of allTeams) {
+      const games = allTeamGames[team.teamId];
+      const totals = aggregateTeamStats(games);
+      const metrics = calculateBasicMetrics(totals);
+      allTeamMetrics[team.teamId] = metrics;
+      team.metrics = metrics;
+    }
   }
   
   console.log('\n📈 CALCULATING RPI & STRENGTH OF SCHEDULE');
