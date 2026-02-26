@@ -52,13 +52,19 @@ router.get('/api/months', async (req, res) => {
   }
 });
 
-// Get available seasons
+// Get available seasons (only those with boxscore data)
 router.get('/api/seasons', async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT DISTINCT season FROM teams ORDER BY season DESC'
     );
-    res.json(result.rows.map(r => r.season));
+    const allSeasons = result.rows.map(r => r.season);
+    // Only expose seasons that have boxscore data
+    const available = allSeasons.filter(s => {
+      const { league = 'mens' } = req.query;
+      return BOXSCORE_AVAILABLE.has(`${league}:${s}`);
+    });
+    res.json(available.length > 0 ? available : allSeasons);
   } catch (err) {
     console.error('Error fetching seasons:', err);
     res.status(500).json({ error: 'Failed to fetch seasons' });

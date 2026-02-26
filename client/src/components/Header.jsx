@@ -40,21 +40,6 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
         </div>
 
         <div className="header-right">
-          {season && (
-            <span
-              className={`source-indicator${season === '2025-26' ? ' boxscore' : ' legacy'}`}
-              title={season === '2025-26' ? 'Using Box Score data source' : 'Using Legacy data source'}
-            >
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="2"/>
-                <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" strokeWidth="2"/>
-                <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" strokeWidth="2"/>
-                <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              <span className="source-indicator-label">{season === '2025-26' ? 'Box Score' : 'Legacy'}</span>
-            </span>
-          )}
           <button
             className="theme-toggle"
             onClick={toggleTheme}
@@ -99,7 +84,7 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
               <option value="womens">Women's Basketball</option>
             </select>
           </div>
-          {seasons.length > 0 && (
+          {seasons.length > 1 && (
             <div className="dropdown-selector">
               <select
                 value={season}
