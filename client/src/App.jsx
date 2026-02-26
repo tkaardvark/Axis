@@ -31,13 +31,27 @@ const DEFAULTS = {
   view: 'table',
 };
 
-// Seasons + leagues with boxscore data available (mirrors backend BOXSCORE_AVAILABLE)
-const BOXSCORE_AVAILABLE = new Set(['mens:2025-26', 'womens:2025-26']);
+// Fetched from backend via /api/data-sources
+let _boxscoreAvailableCache = null;
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [boxscoreAvailable, setBoxscoreAvailable] = useState(_boxscoreAvailableCache || new Set());
+
+  // Fetch data-source config from backend once
+  useEffect(() => {
+    if (_boxscoreAvailableCache) return;
+    fetch(`${API_URL}/api/data-sources`)
+      .then(r => r.json())
+      .then(data => {
+        const s = new Set(data.boxscoreAvailable || []);
+        _boxscoreAvailableCache = s;
+        setBoxscoreAvailable(s);
+      })
+      .catch(err => console.error('Failed to fetch data-source config:', err));
+  }, []);
 
   // Extract params from URL with defaults
   const league = searchParams.get('league') || DEFAULTS.league;
@@ -50,7 +64,7 @@ function App() {
   const view = searchParams.get('view') || DEFAULTS.view;
 
   // Determine data source by season: 2025-26 uses boxscore, older seasons use legacy
-  const sourceParam = BOXSCORE_AVAILABLE.has(`${league}:${season}`) ? '' : '&source=legacy';
+  const sourceParam = boxscoreAvailable.has(`${league}:${season}`) ? '' : '&source=legacy';
 
   const [teams, setTeams] = useState([]);
   const [conferences, setConferences] = useState([]);

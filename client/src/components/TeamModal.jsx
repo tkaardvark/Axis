@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import './TeamModal.css';
 import TeamLogo from './TeamLogo';
 import { API_URL } from '../utils/api';
+import { formatColumnValue, formatDate } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
 
@@ -85,6 +86,7 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
   const [splits, setSplits] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [statGroup, setStatGroup] = useState('Overview');
 
   const handleViewScoutReport = () => {
@@ -101,6 +103,7 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
 
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       try {
         const [splitsRes, scheduleRes] = await Promise.all([
           fetch(`${API_URL}/api/teams/${team.team_id}/splits?season=${season}${sourceParam}`),
@@ -110,8 +113,9 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
         const scheduleData = await scheduleRes.json();
         setSplits(splitsData.splits || []);
         setSchedule(scheduleData.games || []);
-      } catch (error) {
-        console.error('Error fetching team data:', error);
+      } catch (err) {
+        console.error('Error fetching team data:', err);
+        setError('Failed to load team data. Please try again.');
         setSplits([]);
         setSchedule([]);
       } finally {
@@ -135,43 +139,12 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
 
   const columns = STAT_GROUPS[statGroup]?.columns || STAT_GROUPS.Overview.columns;
 
-  // Format value based on column format
-  const formatValue = (split, col) => {
-    if (col.format === 'record') {
-      const wins = split.wins ?? '-';
-      const losses = split.losses ?? '-';
-      return `${wins}-${losses}`;
-    }
-
-    const value = split[col.key];
-    if (value === null || value === undefined) return '-';
-
-    switch (col.format) {
-      case 'int':
-        return parseInt(value);
-      case 'pct1':
-        return (parseFloat(value) * 100).toFixed(1);
-      case 'pct3':
-        return parseFloat(value).toFixed(3);
-      case 'rating':
-        return parseFloat(value).toFixed(1);
-      case 'rating2':
-        return parseFloat(value).toFixed(2);
-      default:
-        return value;
-    }
-  };
+  // Format value based on column format (uses shared formatter)
+  const formatValue = (split, col) => formatColumnValue(split, col);
 
   // Find overall and conference splits for header
   const overallSplit = splits.find(s => s.split_name === 'Overall');
   const confSplit = splits.find(s => s.split_name === 'Conference');
-
-  // Format date for display
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-  };
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
@@ -236,7 +209,9 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
 
           {/* Splits Table */}
           <div className="modal-table-container">
-            {loading ? (
+            {error ? (
+              <div className="modal-no-data">{error}</div>
+            ) : loading ? (
               <SkeletonLoader variant="modal" />
             ) : splits.length === 0 ? (
               <div className="modal-no-data">No split data available</div>

@@ -226,7 +226,8 @@ router.get('/api/bracketcast', async (req, res) => {
             CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location,
             e.away_score as team_score,
             e.home_score as opponent_score,
-            e.is_conference
+            e.is_conference,
+            e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
@@ -240,7 +241,8 @@ router.get('/api/bracketcast', async (req, res) => {
             CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location,
             e.home_score as team_score,
             e.away_score as opponent_score,
-            e.is_conference
+            e.is_conference,
+            e.forfeit_team_id
           FROM exp_game_box_scores e
           JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
           WHERE t.league = $1 AND e.season = $2 AND e.is_exhibition = false
@@ -249,7 +251,7 @@ router.get('/api/bracketcast', async (req, res) => {
             AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
             AND ($3::date IS NULL OR e.game_date <= $3::date)
         )
-        SELECT team_id, opponent_id, location, team_score, opponent_score, is_conference
+        SELECT team_id, opponent_id, location, team_score, opponent_score, is_conference, forfeit_team_id
         FROM flat
       `, [league, season, asOfDate]);
     } else {
@@ -285,7 +287,10 @@ router.get('/api/bracketcast', async (req, res) => {
     // Build opponent lists from date-filtered NAIA games
     gamesResult.rows.forEach(game => {
       if (!teamGameRecords[game.team_id]) return;
-      const isWin = game.team_score > game.opponent_score;
+      // Use forfeit_team_id for win/loss determination when present
+      const isWin = game.forfeit_team_id
+        ? game.forfeit_team_id !== game.team_id
+        : game.team_score > game.opponent_score;
       if (naiaTeamIds.has(String(game.opponent_id))) {
         teamGameRecords[game.team_id].opponents.push({
           id: game.opponent_id,
@@ -378,7 +383,10 @@ router.get('/api/bracketcast', async (req, res) => {
     gamesResult.rows.forEach(game => {
       const oppRpiRank = rpiRanks[game.opponent_id];
       const quadrant = getQuadrant(oppRpiRank, game.location);
-      const isWin = game.team_score > game.opponent_score;
+      // Use forfeit_team_id for win/loss determination when present
+      const isWin = game.forfeit_team_id
+        ? game.forfeit_team_id !== game.team_id
+        : game.team_score > game.opponent_score;
 
       if (quadrantRecords[game.team_id]) {
         const qKey = `q${quadrant}_${isWin ? 'wins' : 'losses'}`;

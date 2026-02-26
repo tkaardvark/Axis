@@ -2,7 +2,12 @@
 
 ## Overview
 
-Axis Analytics uses PostgreSQL with 4 main tables. The schema was created by `setup-database.js` and evolved through 9 migration scripts.
+Axis Analytics uses PostgreSQL with 7 main tables across two generations:
+
+- **Legacy tables:** `teams`, `games`, `team_ratings`, `players` — populated by the root-level legacy pipeline
+- **Box score tables:** `exp_game_box_scores`, `exp_player_game_stats`, `exp_play_by_play` — populated by the `experimental/` box score pipeline
+
+The box score tables are the primary data source for the 2025-26 season onwards. The legacy tables are still populated (for `team_ratings`, conference data, and fallback) but `games` table is no longer the authoritative game data for current seasons.
 
 ## Tables
 
@@ -224,6 +229,145 @@ Stores individual player season statistics. One row per player per season.
 **Unique constraint:** `(player_id, season)`
 **Indexes:** `idx_players_team_id`, `idx_players_season`, `idx_players_league`, `idx_players_team_season`, `idx_players_pts_pg`, `idx_players_last_name`
 
+---
+
+### `exp_game_box_scores`
+
+Primary game data table for 2025-26+. One row per game (NOT per team — each game appears once with away/home columns). Populated by `experimental/import-box-scores.js`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | SERIAL PK | Auto-incrementing primary key |
+| box_score_url | TEXT | Presto Sports box score file path (e.g., `/sports/mbkb/2025-26/boxscores/20260225_abc1.xml`) |
+| season | VARCHAR(10) | Season identifier |
+| league | VARCHAR(10) | `mens` or `womens` |
+| game_date | DATE | Date of game |
+| **Classification flags** | | |
+| is_conference | BOOLEAN | Conference game |
+| is_division | BOOLEAN | Division game |
+| is_exhibition | BOOLEAN | Exhibition game |
+| is_postseason | BOOLEAN | Postseason (conference tournament) game |
+| is_naia_game | BOOLEAN | Both teams are NAIA (set by `markNaiaGames()`) |
+| is_national_tournament | BOOLEAN | National tournament game |
+| is_neutral | BOOLEAN | Neutral-site game |
+| forfeit_team_id | VARCHAR(50) | Team_id of the forfeiting team (null if not a forfeit) |
+| **Away team** | | |
+| away_team_name | VARCHAR(255) | Away team display name |
+| away_team_id | VARCHAR(50) | Away team Presto Sports ID (null if parser couldn't extract) |
+| away_team_record | VARCHAR(20) | Record at time of game (e.g., "15-3") |
+| away_score | INTEGER | Final score |
+| away_period_scores | JSONB | Period scores as array, e.g., `[32, 29]` or `[32, 29, 10]` for OT |
+| **Home team** | | |
+| home_team_name | VARCHAR(255) | Home team display name |
+| home_team_id | VARCHAR(50) | Home team Presto Sports ID |
+| home_team_record | VARCHAR(20) | Record at time of game |
+| home_score | INTEGER | Final score |
+| home_period_scores | JSONB | Period scores as array |
+| **Game metadata** | | |
+| status | VARCHAR(50) | Game status text (e.g., "Final", "Final (OT)") |
+| num_periods | INTEGER | Number of periods played (2 for regulation, 3+ for OT) |
+| location_text | VARCHAR(255) | Venue text from box score |
+| attendance | INTEGER | Attendance figure |
+| ties | INTEGER | Number of tie scores during the game |
+| lead_changes | INTEGER | Number of lead changes |
+| **Away team box score** | | |
+| away_fgm, away_fga | INTEGER | Field goals made/attempted |
+| away_fg_pct | DECIMAL(5,3) | Field goal percentage |
+| away_fgm3, away_fga3 | INTEGER | 3-pointers made/attempted |
+| away_fg3_pct | DECIMAL(5,3) | 3-point percentage |
+| away_ftm, away_fta | INTEGER | Free throws made/attempted |
+| away_ft_pct | DECIMAL(5,3) | Free throw percentage |
+| away_oreb, away_dreb, away_reb | INTEGER | Rebounds |
+| away_ast | INTEGER | Assists |
+| away_stl | INTEGER | Steals |
+| away_blk | INTEGER | Blocks |
+| away_to | INTEGER | Turnovers |
+| away_pf | INTEGER | Personal fouls |
+| away_pts | INTEGER | Total points |
+| away_points_in_paint | INTEGER | |
+| away_fastbreak_points | INTEGER | |
+| away_bench_points | INTEGER | |
+| away_second_chance_points | INTEGER | |
+| away_points_off_turnovers | INTEGER | |
+| away_largest_lead | INTEGER | |
+| away_time_of_largest_lead | VARCHAR(20) | |
+| **Home team box score** | | (same columns as away, prefixed `home_`) |
+| home_fgm through home_time_of_largest_lead | (same types) | Mirror of away_ columns |
+| **Timestamps** | | |
+| created_at | TIMESTAMP | Row creation |
+| updated_at | TIMESTAMP | Row update |
+
+**Unique constraint:** `(box_score_url, season)`
+**Indexes:** `idx_exp_gbs_date`, `idx_exp_gbs_season`, `idx_exp_gbs_away_team`, `idx_exp_gbs_home_team`, `idx_exp_gbs_type` (conference+exhibition+postseason), partial index on `is_naia_game = true`, partial index on `forfeit_team_id IS NOT NULL`
+
+**Key difference from `games` table:** Box scores store ONE row per game (with away/home columns), while `games` stores TWO rows per game (one per team perspective). The `dynamicStatsBoxScore.js` CTE "flattens" each box score row into two per-team rows before aggregation.
+
+---
+
+### `exp_player_game_stats`
+
+Per-player per-game statistics. Populated by `experimental/import-box-scores.js`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | SERIAL PK | Auto-incrementing primary key |
+| game_box_score_id | INTEGER | FK → `exp_game_box_scores(id)` ON DELETE CASCADE |
+| box_score_url | TEXT | Box score URL (denormalized for convenience) |
+| season | VARCHAR(10) | Season identifier |
+| player_name | VARCHAR(255) | Player display name |
+| player_url | TEXT | Presto Sports player profile URL |
+| player_id | VARCHAR(50) | Extracted from player_url |
+| uniform_number | VARCHAR(10) | Jersey number |
+| team_name | VARCHAR(255) | Team name |
+| team_id | VARCHAR(50) | Team Presto Sports ID |
+| is_home | BOOLEAN | Whether player is on the home team |
+| is_starter | BOOLEAN | Whether player started the game |
+| minutes | INTEGER | Minutes played |
+| fgm, fga | INTEGER | Field goals |
+| fgm3, fga3 | INTEGER | 3-pointers |
+| ftm, fta | INTEGER | Free throws |
+| oreb, dreb, reb | INTEGER | Rebounds |
+| ast | INTEGER | Assists |
+| stl | INTEGER | Steals |
+| blk | INTEGER | Blocks |
+| turnovers | INTEGER | Turnovers |
+| pf | INTEGER | Personal fouls |
+| pts | INTEGER | Points |
+| created_at | TIMESTAMP | Row creation |
+
+**Unique constraint:** `(box_score_url, player_id, season)` — note: NULL player_ids bypass UNIQUE checks
+**Indexes:** `idx_exp_pgs_game`, `idx_exp_pgs_player`, `idx_exp_pgs_team`, `idx_exp_pgs_season`
+
+---
+
+### `exp_play_by_play`
+
+Every play event from box scores. Used for lineup analysis, scoring run detection, clutch stats, and lead/tie counting.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | SERIAL PK | Auto-incrementing primary key |
+| game_box_score_id | INTEGER | FK → `exp_game_box_scores(id)` ON DELETE CASCADE |
+| box_score_url | TEXT | Box score URL (denormalized) |
+| season | VARCHAR(10) | Season identifier |
+| period | INTEGER | Period number (1, 2, 3=OT1, etc.) |
+| game_clock | VARCHAR(10) | Time remaining (e.g., "15:23", "00:45") |
+| sequence_number | INTEGER | Ordering within the game (0-indexed) |
+| team_name | VARCHAR(255) | Team performing the action |
+| team_id | VARCHAR(50) | Always NULL (known issue — never populated) |
+| is_home | BOOLEAN | Whether action is by home team |
+| player_name | VARCHAR(255) | Player name (ALL-CAPS from Presto) |
+| action_text | TEXT | Raw action description |
+| action_type | VARCHAR(50) | Classified type: `'made_2pt'`, `'made_3pt'`, `'made_ft'`, `'missed_2pt'`, `'missed_3pt'`, `'missed_ft'`, `'rebound'`, `'turnover'`, `'foul'`, `'steal'`, `'block'`, `'assist'`, `'substitution'`, `'timeout'`, `'jumpball'`, `'other'` |
+| is_scoring_play | BOOLEAN | Whether this play changed the score |
+| away_score | INTEGER | Running away score after this play |
+| home_score | INTEGER | Running home score after this play |
+| created_at | TIMESTAMP | Row creation |
+
+**Indexes:** `idx_exp_pbp_game`, `idx_exp_pbp_period`, `idx_exp_pbp_team`, `idx_exp_pbp_type`, `idx_exp_pbp_season`, `idx_exp_pbp_sequence` (game_box_score_id + sequence_number)
+
+---
+
 ## Relationships
 
 ```
@@ -231,6 +375,11 @@ teams.team_id ←── games.team_id
 teams.team_id ←── games.opponent_id
 teams.team_id ←── team_ratings.team_id
 teams.team_id ←── players.team_id
+teams.team_id ←── exp_game_box_scores.away_team_id
+teams.team_id ←── exp_game_box_scores.home_team_id
+teams.team_id ←── exp_player_game_stats.team_id
+exp_game_box_scores.id ←── exp_player_game_stats.game_box_score_id
+exp_game_box_scores.id ←── exp_play_by_play.game_box_score_id
 ```
 
 Note: Foreign key constraints were dropped in `migrate-add-season.js` to simplify multi-season data management. Referential integrity is maintained at the application level.
@@ -250,5 +399,12 @@ Note: Foreign key constraints were dropped in `migrate-add-season.js` to simplif
 | 9 | `migrate-add-national-tournament.js` | Adds `is_national_tournament` flag to `games` |
 | 10 | `migrate-sos-precision.js` | Increases decimal precision on SOS columns |
 | 11 | `migrate-copy-locations.js` | Copies location data between seasons |
+| 12 | `experimental/migrate-create-tables.js` | Creates `exp_game_box_scores`, `exp_player_game_stats`, `exp_play_by_play` |
+| 13 | `migrations/002_add_exp_game_flags.js` | Adds `is_naia_game`, `is_national_tournament`, `is_neutral` to `exp_game_box_scores` |
+| 14 | `migrations/002_create_import_log_table.sql` | Creates `box_score_import_log` table for gap-fill auditing |
+| 15 | `migrations/003_create_future_games.js` | Creates `future_games` table for projected records |
+| 16 | `migrations/backfill-exp-game-flags.js` | Backfills `is_naia_game`/`is_national_tournament` data for existing rows |
+| 17 | (unnamed) | Adds `forfeit_team_id`, `is_forfeit` to `exp_game_box_scores` |
+| 18 | (unnamed) | Adds game flow columns to `team_ratings`: `close_wins`, `close_losses`, `blowout_wins`, `blowout_losses`, `half_lead_win_pct`, `comeback_win_pct`, `lead_changes_per_game`, `ties_per_game`, `avg_largest_lead`, `avg_opp_largest_lead`, `second_chance_per_game`, `opp_second_chance_per_game`, `runs_scored_per_game`, `runs_allowed_per_game` |
 
 Migrations are ad-hoc Node.js scripts, not managed by a migration framework. They must be run manually and in order.

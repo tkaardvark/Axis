@@ -159,18 +159,18 @@ async function refreshTeamStats(season, league) {
         AVG(COALESCE(ties, 0)) as avg_ties,
         AVG(COALESCE(largest_lead, 0)) as avg_largest_lead,
         AVG(COALESCE(opp_largest_lead, 0)) as avg_opp_largest_lead,
-        -- Close games (within 5 points) - use forfeit-aware win logic
-        SUM(CASE WHEN ABS(team_score - opponent_score) <= 5 AND ((forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score)) THEN 1 ELSE 0 END) as close_wins,
-        SUM(CASE WHEN ABS(team_score - opponent_score) <= 5 AND (forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score)) THEN 1 ELSE 0 END) as close_losses,
-        -- Blowouts (15+ margin)
-        SUM(CASE WHEN team_score - opponent_score >= 15 THEN 1 ELSE 0 END) as blowout_wins,
-        SUM(CASE WHEN opponent_score - team_score >= 15 THEN 1 ELSE 0 END) as blowout_losses,
-        -- Leading at halftime - use forfeit-aware win logic
-        SUM(CASE WHEN team_half1_score > opp_half1_score AND ((forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score)) THEN 1 ELSE 0 END) as half_lead_wins,
-        SUM(CASE WHEN team_half1_score > opp_half1_score THEN 1 ELSE 0 END) as half_lead_games,
-        -- Comebacks - use forfeit-aware win logic
-        SUM(CASE WHEN team_half1_score < opp_half1_score AND ((forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score)) THEN 1 ELSE 0 END) as comeback_wins,
-        SUM(CASE WHEN team_half1_score < opp_half1_score THEN 1 ELSE 0 END) as trailing_half_games
+        -- Close games (within 5 points) - exclude forfeits (artificial 2-0 scores)
+        SUM(CASE WHEN forfeit_team_id IS NULL AND ABS(team_score - opponent_score) <= 5 AND team_score > opponent_score THEN 1 ELSE 0 END) as close_wins,
+        SUM(CASE WHEN forfeit_team_id IS NULL AND ABS(team_score - opponent_score) <= 5 AND team_score < opponent_score THEN 1 ELSE 0 END) as close_losses,
+        -- Blowouts (15+ margin) - exclude forfeits
+        SUM(CASE WHEN forfeit_team_id IS NULL AND team_score - opponent_score >= 15 THEN 1 ELSE 0 END) as blowout_wins,
+        SUM(CASE WHEN forfeit_team_id IS NULL AND opponent_score - team_score >= 15 THEN 1 ELSE 0 END) as blowout_losses,
+        -- Leading at halftime - exclude forfeits
+        SUM(CASE WHEN forfeit_team_id IS NULL AND team_half1_score > opp_half1_score AND team_score > opponent_score THEN 1 ELSE 0 END) as half_lead_wins,
+        SUM(CASE WHEN forfeit_team_id IS NULL AND team_half1_score > opp_half1_score THEN 1 ELSE 0 END) as half_lead_games,
+        -- Comebacks - exclude forfeits
+        SUM(CASE WHEN forfeit_team_id IS NULL AND team_half1_score < opp_half1_score AND team_score > opponent_score THEN 1 ELSE 0 END) as comeback_wins,
+        SUM(CASE WHEN forfeit_team_id IS NULL AND team_half1_score < opp_half1_score THEN 1 ELSE 0 END) as trailing_half_games
       FROM flat_games
       GROUP BY team_id
     ),
@@ -242,95 +242,94 @@ async function refreshTeamStats(season, league) {
     // Get today's date for date_calculated
     const today = new Date().toISOString().split('T')[0];
 
-    // Update each team's stats in team_ratings
-    let updated = 0;
+    // Batch update all teams in a single query using a VALUES list
+    const valueRows = [];
+    const params = [season];
+    let paramIdx = 2;
+
     for (const team of stats) {
-      await pool.query(`
-        UPDATE team_ratings SET
-          ast_per_game = $2,
-          to_per_game = $3,
-          reb_per_game = $4,
-          oreb_per_game = $5,
-          dreb_per_game = $6,
-          fgm_per_game = $7,
-          fgm3_per_game = $8,
-          ftm_per_game = $9,
-          pf_per_game = $10,
-          stl_per_game = $11,
-          blk_per_game = $12,
-          pts_paint_per_game = $13,
-          pts_fastbreak_per_game = $14,
-          pts_off_to_per_game = $15,
-          pts_bench_per_game = $16,
-          opp_ast_per_game = $17,
-          opp_reb_per_game = $18,
-          opp_pts_paint_per_game = $19,
-          opp_pts_fastbreak_per_game = $20,
-          opp_pts_off_to_per_game = $21,
-          lead_changes_per_game = $22,
-          ties_per_game = $23,
-          avg_largest_lead = $24,
-          avg_opp_largest_lead = $25,
-          second_chance_per_game = $26,
-          opp_second_chance_per_game = $27,
-          close_wins = $28,
-          close_losses = $29,
-          blowout_wins = $30,
-          blowout_losses = $31,
-          half_lead_win_pct = $32,
-          half_lead_wins = $33,
-          half_lead_games = $34,
-          comeback_win_pct = $35,
-          comeback_wins = $36,
-          trailing_half_games = $37,
-          effective_possession_ratio = $38,
-          boxscore_updated_at = CURRENT_TIMESTAMP
-        WHERE team_id = $1
-          AND season = $39
-          AND date_calculated = (SELECT MAX(date_calculated) FROM team_ratings WHERE team_id = $1 AND season = $39)
-      `, [
-        team.team_id,
-        team.ast_per_game,
-        team.to_per_game,
-        team.reb_per_game,
-        team.oreb_per_game,
-        team.dreb_per_game,
-        team.fgm_per_game,
-        team.fgm3_per_game,
-        team.ftm_per_game,
-        team.pf_per_game,
-        team.stl_per_game,
-        team.blk_per_game,
-        team.pts_paint_per_game,
-        team.pts_fastbreak_per_game,
-        team.pts_off_to_per_game,
-        team.pts_bench_per_game,
-        team.opp_ast_per_game,
-        team.opp_reb_per_game,
-        team.opp_pts_paint_per_game,
-        team.opp_pts_fastbreak_per_game,
-        team.opp_pts_off_to_per_game,
-        team.lead_changes_per_game,
-        team.ties_per_game,
-        team.avg_largest_lead,
-        team.avg_opp_largest_lead,
-        team.second_chance_per_game,
-        team.opp_second_chance_per_game,
-        team.close_wins,
-        team.close_losses,
-        team.blowout_wins,
-        team.blowout_losses,
-        team.half_lead_win_pct,
-        team.half_lead_wins,
-        team.half_lead_games,
-        team.comeback_win_pct,
-        team.comeback_wins,
-        team.trailing_half_games,
+      const fields = [
+        team.team_id, team.ast_per_game, team.to_per_game, team.reb_per_game,
+        team.oreb_per_game, team.dreb_per_game, team.fgm_per_game, team.fgm3_per_game,
+        team.ftm_per_game, team.pf_per_game, team.stl_per_game, team.blk_per_game,
+        team.pts_paint_per_game, team.pts_fastbreak_per_game, team.pts_off_to_per_game,
+        team.pts_bench_per_game, team.opp_ast_per_game, team.opp_reb_per_game,
+        team.opp_pts_paint_per_game, team.opp_pts_fastbreak_per_game, team.opp_pts_off_to_per_game,
+        team.lead_changes_per_game, team.ties_per_game, team.avg_largest_lead,
+        team.avg_opp_largest_lead, team.second_chance_per_game, team.opp_second_chance_per_game,
+        team.close_wins, team.close_losses, team.blowout_wins, team.blowout_losses,
+        team.half_lead_win_pct, team.half_lead_wins, team.half_lead_games,
+        team.comeback_win_pct, team.comeback_wins, team.trailing_half_games,
         team.effective_possession_ratio,
-        season
-      ]);
-      updated++;
+      ];
+      const placeholders = fields.map(() => `$${paramIdx++}`);
+      valueRows.push(`(${placeholders.join(', ')})`);
+      params.push(...fields);
     }
+
+    const updateResult = await pool.query(`
+      UPDATE team_ratings AS tr SET
+        ast_per_game = v.ast_per_game,
+        to_per_game = v.to_per_game,
+        reb_per_game = v.reb_per_game,
+        oreb_per_game = v.oreb_per_game,
+        dreb_per_game = v.dreb_per_game,
+        fgm_per_game = v.fgm_per_game,
+        fgm3_per_game = v.fgm3_per_game,
+        ftm_per_game = v.ftm_per_game,
+        pf_per_game = v.pf_per_game,
+        stl_per_game = v.stl_per_game,
+        blk_per_game = v.blk_per_game,
+        pts_paint_per_game = v.pts_paint_per_game,
+        pts_fastbreak_per_game = v.pts_fastbreak_per_game,
+        pts_off_to_per_game = v.pts_off_to_per_game,
+        pts_bench_per_game = v.pts_bench_per_game,
+        opp_ast_per_game = v.opp_ast_per_game,
+        opp_reb_per_game = v.opp_reb_per_game,
+        opp_pts_paint_per_game = v.opp_pts_paint_per_game,
+        opp_pts_fastbreak_per_game = v.opp_pts_fastbreak_per_game,
+        opp_pts_off_to_per_game = v.opp_pts_off_to_per_game,
+        lead_changes_per_game = v.lead_changes_per_game,
+        ties_per_game = v.ties_per_game,
+        avg_largest_lead = v.avg_largest_lead,
+        avg_opp_largest_lead = v.avg_opp_largest_lead,
+        second_chance_per_game = v.second_chance_per_game,
+        opp_second_chance_per_game = v.opp_second_chance_per_game,
+        close_wins = v.close_wins,
+        close_losses = v.close_losses,
+        blowout_wins = v.blowout_wins,
+        blowout_losses = v.blowout_losses,
+        half_lead_win_pct = v.half_lead_win_pct,
+        half_lead_wins = v.half_lead_wins,
+        half_lead_games = v.half_lead_games,
+        comeback_win_pct = v.comeback_win_pct,
+        comeback_wins = v.comeback_wins,
+        trailing_half_games = v.trailing_half_games,
+        effective_possession_ratio = v.effective_possession_ratio,
+        boxscore_updated_at = CURRENT_TIMESTAMP
+      FROM (VALUES ${valueRows.join(',\n        ')}) AS v(
+        team_id, ast_per_game, to_per_game, reb_per_game,
+        oreb_per_game, dreb_per_game, fgm_per_game, fgm3_per_game,
+        ftm_per_game, pf_per_game, stl_per_game, blk_per_game,
+        pts_paint_per_game, pts_fastbreak_per_game, pts_off_to_per_game,
+        pts_bench_per_game, opp_ast_per_game, opp_reb_per_game,
+        opp_pts_paint_per_game, opp_pts_fastbreak_per_game, opp_pts_off_to_per_game,
+        lead_changes_per_game, ties_per_game, avg_largest_lead,
+        avg_opp_largest_lead, second_chance_per_game, opp_second_chance_per_game,
+        close_wins, close_losses, blowout_wins, blowout_losses,
+        half_lead_win_pct, half_lead_wins, half_lead_games,
+        comeback_win_pct, comeback_wins, trailing_half_games,
+        effective_possession_ratio
+      )
+      WHERE tr.team_id = v.team_id
+        AND tr.season = $1
+        AND tr.date_calculated = (
+          SELECT MAX(date_calculated) FROM team_ratings
+          WHERE team_id = tr.team_id AND season = $1
+        )
+    `, params);
+
+    const updated = updateResult.rowCount;
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`  Updated ${updated} teams in ${elapsed}s`);

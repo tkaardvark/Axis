@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
-const { resolveSource } = require('../utils/dataSource');
+const { resolveSource, BOXSCORE_AVAILABLE } = require('../utils/dataSource');
 
 // Get available months that have games
 router.get('/api/months', async (req, res) => {
@@ -227,6 +227,11 @@ router.get('/api/import-log', async (req, res) => {
     console.error('Error fetching import log:', err);
     res.status(500).json({ error: 'Failed to fetch import log' });
   }
+});
+
+// Return the set of league:season combos that use the boxscore pipeline
+router.get('/api/data-sources', (req, res) => {
+  res.json({ boxscoreAvailable: [...BOXSCORE_AVAILABLE] });
 });
 
 module.exports = router;

@@ -15,6 +15,7 @@ import TeamLogo from './TeamLogo';
 import MatchupComparisonBar from './MatchupComparisonBar';
 
 import { API_URL } from '../utils/api';
+import { formatDate } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
 
 const RADAR_METRICS = [
@@ -34,11 +35,6 @@ function getPercentile(value, allValues, higherIsBetter = true) {
   return higherIsBetter ? percentile : 100 - percentile;
 }
 
-const formatDate = (dateStr) => {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-};
-
 function Matchup({ league, season, teams = [], conferences = [], sourceParam = '' }) {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -48,6 +44,7 @@ function Matchup({ league, season, teams = [], conferences = [], sourceParam = '
   const [conf2, setConf2] = useState('All Conferences');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Sync team selections from URL params (e.g. navigated from schedule matchup link)
   useEffect(() => {
@@ -91,6 +88,7 @@ function Matchup({ league, season, teams = [], conferences = [], sourceParam = '
 
     const fetchMatchup = async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await fetch(`${API_URL}/api/matchup?team1=${team1Id}&team2=${team2Id}&season=${season}&league=${league}${sourceParam}`);
         if (!res.ok) throw new Error('Failed to fetch');
@@ -98,6 +96,7 @@ function Matchup({ league, season, teams = [], conferences = [], sourceParam = '
         setData(json);
       } catch (err) {
         console.error('Error fetching matchup:', err);
+        setError('Failed to load matchup data. Please try again.');
         setData(null);
       } finally {
         setLoading(false);
@@ -216,6 +215,10 @@ function Matchup({ league, season, teams = [], conferences = [], sourceParam = '
       )}
 
       {loading && <SkeletonLoader variant="card" rows={6} />}
+
+      {error && !loading && (
+        <div className="matchup-warning">{error}</div>
+      )}
 
       {data && !loading && (
         <div className="matchup-content">

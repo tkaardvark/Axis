@@ -8,6 +8,7 @@ import BoxScoreModal from './BoxScoreModal';
 import Matchup from './Matchup';
 import { API_URL } from '../utils/api';
 import { normalizeYear, normalizePosition } from '../utils/normalizers';
+import { formatColumnValue, formatDate } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
 import { TOOLTIPS } from '../utils/tooltips';
 
@@ -272,32 +273,8 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
     return '';  // Middle 20% - no highlight
   };
 
-  // Format value based on column format
-  const formatValue = (split, col) => {
-    if (col.format === 'record') {
-      const wins = split.wins ?? '-';
-      const losses = split.losses ?? '-';
-      return `${wins}-${losses}`;
-    }
-
-    const value = split[col.key];
-    if (value === null || value === undefined) return '-';
-
-    switch (col.format) {
-      case 'int':
-        return parseInt(value);
-      case 'pct1':
-        return (parseFloat(value) * 100).toFixed(1);
-      case 'pct3':
-        return parseFloat(value).toFixed(3);
-      case 'rating':
-        return parseFloat(value).toFixed(1);
-      case 'rating2':
-        return parseFloat(value).toFixed(2);
-      default:
-        return value;
-    }
-  };
+  // Format value based on column format (uses shared formatter)
+  const formatValue = (split, col) => formatColumnValue(split, col);
 
   // Find overall and conference splits for header
   const overallSplit = splits.find(s => s.split_name === 'Overall');
@@ -366,13 +343,6 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
     return { strengths: strengths.slice(0, 5), weaknesses: weaknesses.slice(0, 5) };
   }, [percentiles]);
 
-
-  // Format date for display
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-  };
 
   // Sort teams alphabetically for dropdown, filtered by conference
   const sortedTeams = useMemo(() => {

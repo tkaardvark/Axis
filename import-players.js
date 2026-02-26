@@ -8,7 +8,6 @@
  */
 
 require('dotenv').config();
-const { Pool } = require('pg');
 const https = require('https');
 
 // Parse command line arguments
@@ -160,10 +159,7 @@ async function importPlayers() {
   console.log(`Fetching data from: ${url}`);
   
   // Connect to database
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
+  const { pool } = require('./db/pool');
   
   try {
     // Fetch player data

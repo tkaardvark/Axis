@@ -3,6 +3,7 @@ import './BoxScoreModal.css';
 import TeamLogo from './TeamLogo';
 import ScoreChart from './ScoreChart';
 import { API_URL } from '../utils/api';
+import { formatDateWithYear } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
 
@@ -142,12 +143,14 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
   const focusTrapRef = useFocusTrap();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!gameId) return;
 
     const fetchBoxScore = async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await fetch(`${API_URL}/api/games/${gameId}/boxscore?season=${season}${sourceParam}`);
         if (!res.ok) throw new Error('Failed to fetch');
@@ -155,6 +158,7 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
         setData(json);
       } catch (err) {
         console.error('Error fetching box score:', err);
+        setError('Failed to load box score. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -180,10 +184,7 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
     return (val * 100).toFixed(1) + '%';
   };
 
-  const formatDate = (dateStr) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-  };
+  const formatDate = (dateStr) => formatDateWithYear(dateStr);
 
   const gameFlow = useMemo(() => {
     if (!data?.score_progression) return null;
@@ -203,6 +204,8 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
 
         {loading ? (
           <SkeletonLoader variant="modal" />
+        ) : error ? (
+          <div className="boxscore-loading">{error}</div>
         ) : !data ? (
           <div className="boxscore-loading">Box score unavailable</div>
         ) : (

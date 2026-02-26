@@ -19,22 +19,27 @@ const LEAGUE_PATHS = {
 };
 
 /**
- * Fetch a URL and return the response body as a string
+ * Fetch a URL and return the response body as a string.
+ * Includes a 30-second timeout to prevent hanging on unresponsive servers.
  */
-function fetchPage(url) {
+function fetchPage(url, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const parsedUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
     const client = parsedUrl.startsWith('https') ? https : http;
-    client.get(parsedUrl, (res) => {
+    const req = client.get(parsedUrl, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         // Follow redirect
-        return fetchPage(res.headers.location).then(resolve).catch(reject);
+        return fetchPage(res.headers.location, timeoutMs).then(resolve).catch(reject);
       }
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => resolve(data));
       res.on('error', reject);
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Request timed out after ${timeoutMs}ms: ${parsedUrl}`));
+    });
   });
 }
 

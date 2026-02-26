@@ -4,6 +4,7 @@ import TeamLogo from './TeamLogo';
 import SkeletonLoader from './SkeletonLoader';
 import { TOOLTIPS } from '../utils/tooltips';
 import { exportToCSV } from '../utils/csv';
+import { formatStatValue } from '../utils/formatters';
 
 // Columns that should show sub-rankings with conditional formatting
 // sortLowerFirst: true means lower values get rank 1 (like defense)
@@ -245,26 +246,7 @@ function TeamsTable({ teams, loading, statGroup = 'Overview', onTeamClick, onCon
       return `${team.blowout_wins || 0}-${team.blowout_losses || 0}`;
     }
 
-    const value = team[key];
-    if (value === null || value === undefined) return '-';
-
-    switch (format) {
-      case 'int':
-        return Math.round(Number(value));
-      case 'rating':
-        return Number(value).toFixed(1);
-      case 'rating2':
-        // 2 decimal places for adjusted/net ratings
-        return Number(value).toFixed(2);
-      case 'pct1':
-        // Convert decimal to percentage (0.493 -> 49.3%)
-        return (Number(value) * 100).toFixed(1);
-      case 'pct3':
-        // Keep as decimal for RPI-style stats
-        return Number(value).toFixed(3);
-      default:
-        return value;
-    }
+    return formatStatValue(team[key], format);
   };
 
   // Get color class based on rank percentile

@@ -1271,35 +1271,50 @@ router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
     const gameIds = gamesResult.rows.map(g => g.game_id);
     const lineupMap = {}; // key (sorted player IDs) -> stats
 
+    // Fetch all PBP and starters in bulk (2 queries instead of 2 per game)
+    const [allPbpResult, allStartersResult] = await Promise.all([
+      pool.query(`
+        SELECT game_box_score_id, period, game_clock, player_name, action_type, action_text, 
+               is_scoring_play, away_score, home_score, team_name, is_home
+        FROM exp_play_by_play
+        WHERE game_box_score_id = ANY($1)
+        ORDER BY game_box_score_id, period, 
+          CASE WHEN game_clock ~ '^[0-9]+:[0-9]+$' 
+            THEN CAST(SPLIT_PART(game_clock, ':', 1) AS INTEGER) * 60 + CAST(SPLIT_PART(game_clock, ':', 2) AS INTEGER)
+            ELSE 0 END DESC,
+          sequence_number
+      `, [gameIds]),
+      pool.query(`
+        SELECT game_box_score_id, player_name, player_id
+        FROM exp_player_game_stats
+        WHERE game_box_score_id = ANY($1) AND team_name = $2 AND is_starter = true
+      `, [gameIds, teamName])
+    ]);
+
+    // Group PBP by game
+    const pbpByGame = {};
+    for (const row of allPbpResult.rows) {
+      if (!pbpByGame[row.game_box_score_id]) pbpByGame[row.game_box_score_id] = [];
+      pbpByGame[row.game_box_score_id].push(row);
+    }
+
+    // Group starters by game
+    const startersByGame = {};
+    for (const row of allStartersResult.rows) {
+      if (!startersByGame[row.game_box_score_id]) startersByGame[row.game_box_score_id] = [];
+      startersByGame[row.game_box_score_id].push(row);
+    }
+
     // Process each game
     for (const game of gamesResult.rows) {
       const isHome = game.home_team_name === teamName;
       const teamScore = isHome ? game.home_score : game.away_score;
       const oppScore = isHome ? game.away_score : game.home_score;
       
-      // Get play-by-play for this game, ordered by period and time
-      const pbpResult = await pool.query(`
-        SELECT period, game_clock, player_name, action_type, action_text, 
-               is_scoring_play, away_score, home_score, team_name, is_home
-        FROM exp_play_by_play
-        WHERE game_box_score_id = $1
-        ORDER BY period, 
-          CASE WHEN game_clock ~ '^[0-9]+:[0-9]+$' 
-            THEN CAST(SPLIT_PART(game_clock, ':', 1) AS INTEGER) * 60 + CAST(SPLIT_PART(game_clock, ':', 2) AS INTEGER)
-            ELSE 0 END DESC,
-          sequence_number
-      `, [game.game_id]);
+      const pbpRows = pbpByGame[game.game_id] || [];
+      const starterRows = startersByGame[game.game_id] || [];
 
-      if (!pbpResult.rows.length) continue;
-
-      // Get starters for this game
-      const startersResult = await pool.query(`
-        SELECT player_name, player_id
-        FROM exp_player_game_stats
-        WHERE game_box_score_id = $1 AND team_name = $2 AND is_starter = true
-      `, [game.game_id, teamName]);
-
-      if (startersResult.rows.length !== 5) continue; // Skip games without proper starter data
+      if (!pbpRows.length || starterRows.length !== 5) continue;
 
       // Normalize player name for consistent matching (handles "First Last" vs "LAST,FIRST")
       const normalizeName = (name) => {
@@ -1324,7 +1339,7 @@ router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
       // Track current lineup on court
       const onCourt = new Map(); // normalizedName -> displayName
       const entryOrder = []; // Track order players entered (for removal)
-      startersResult.rows.forEach(p => {
+      starterRows.forEach(p => {
         const normalized = normalizeName(p.player_name);
         const display = formatDisplayName(p.player_name);
         onCourt.set(normalized, display);
@@ -1335,7 +1350,7 @@ router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
       let lastOppScore = 0;
 
       // Process each play
-      for (const play of pbpResult.rows) {
+      for (const play of pbpRows) {
         // Handle substitutions - only "enters" events exist in the data
         if (play.action_type === 'substitution' && play.team_name === teamName) {
           const text = (play.action_text || '').toLowerCase();

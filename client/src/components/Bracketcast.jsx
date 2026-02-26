@@ -63,6 +63,7 @@ const LOWER_IS_BETTER = new Set([
 function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
   const [data, setData] = useState({ teams: [], bracket: {}, pods: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [view, setView] = useState('table'); // 'table', 'bracket', or 'pods'
   const [sort, setSort] = useState(BRACKETCAST_STAT_GROUPS['Primary Criteria'].defaultSort);
   const [expandedTeams, setExpandedTeams] = useState(new Set()); // Track expanded teams in Seed Groups
@@ -76,6 +77,7 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
   useEffect(() => {
     const fetchBracketcast = async () => {
       setLoading(true);
+      setError(null);
       try {
         let url = `${API_URL}/api/bracketcast?league=${league}&season=${season}${sourceParam}`;
         if (asOfDate) {
@@ -84,8 +86,9 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
         const response = await fetch(url);
         const result = await response.json();
         setData(result);
-      } catch (error) {
-        console.error('Failed to fetch bracketcast:', error);
+      } catch (err) {
+        console.error('Failed to fetch bracketcast:', err);
+        setError('Failed to load bracket data. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -225,6 +228,17 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
           <h1>Bracketcast</h1>
         </div>
         <SkeletonLoader variant="table" rows={12} />
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="main-content bracketcast-page">
+        <div className="page-header">
+          <h1>Bracketcast</h1>
+        </div>
+        <div className="error-banner">{error}</div>
       </main>
     );
   }

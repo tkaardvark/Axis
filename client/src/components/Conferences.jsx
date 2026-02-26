@@ -37,6 +37,7 @@ class ConferenceErrorBoundary extends Component {
 }
 
 import { API_URL } from '../utils/api';
+import { formatDate } from '../utils/formatters';
 
 // Profile comparison metrics (conference avg vs national avg)
 const PROFILE_METRICS = [
@@ -88,6 +89,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
   const [headToHead, setHeadToHead] = useState(null);
   const [scheduleGames, setScheduleGames] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [rankingsLoading, setRankingsLoading] = useState(false);
   const [netScatterData, setNetScatterData] = useState([]);
   const [netScatterLoading, setNetScatterLoading] = useState(false);
@@ -129,8 +131,9 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
         const res = await fetch(`${API_URL}/api/conference-rankings?league=${league}&season=${season}${sourceParam}`);
         const data = await res.json();
         setConfRankings(data);
-      } catch (error) {
-        console.error('Error fetching conference rankings:', error);
+      } catch (err) {
+        console.error('Error fetching conference rankings:', err);
+        setError('Failed to load conference rankings.');
       } finally {
         setRankingsLoading(false);
       }
@@ -146,8 +149,8 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
         const res = await fetch(`${API_URL}/api/conference-rpi-scatter?league=${league}&season=${season}${sourceParam}`);
         const data = await res.json();
         setNetScatterData(data);
-      } catch (error) {
-        console.error('Error fetching scatter data:', error);
+      } catch (err) {
+        console.error('Error fetching scatter data:', err);
       } finally {
         setNetScatterLoading(false);
       }
@@ -178,8 +181,9 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
         setSummary(summaryData);
         setNationalAvgs(nationalData);
         setHeadToHead(h2hData);
-      } catch (error) {
-        console.error('Error fetching conference data:', error);
+      } catch (err) {
+        console.error('Error fetching conference data:', err);
+        setError('Failed to load conference data.');
       } finally {
         setLoading(false);
       }
@@ -202,8 +206,8 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
         // Only show conference matchups (both teams in the conference)
         const confGames = (data.games || []).filter(g => g.is_conference_matchup);
         setScheduleGames(confGames);
-      } catch (error) {
-        console.error('Error fetching schedule:', error);
+      } catch (err) {
+        console.error('Error fetching schedule:', err);
         setScheduleGames([]);
       } finally {
         setScheduleLoading(false);
@@ -485,12 +489,6 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
     navigate(`/scout?team=${team.team_id}&league=${league}&season=${season}`);
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-  };
-
   const ProfileTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const metricDef = PROFILE_METRICS.find(m => m.label === label);
@@ -529,6 +527,8 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
         <h1>Conferences</h1>
         <p className="page-subtitle">Conference breakdown, standings, and cross-team analysis</p>
       </div>
+
+      {error && <div className="error-banner">{error}</div>}
 
       {/* Tab Navigation */}
       <div className="page-tabs">

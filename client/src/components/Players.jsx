@@ -122,6 +122,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [vizLoading, setVizLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [statGroup, setStatGroup] = useState('Overview');
   const [view, setView] = useState('table');
   const [filters, setFilters] = useState({
@@ -164,6 +165,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
   // Fetch all players matching filters (for client-side sort/page)
   const fetchPlayers = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       let url = `${API_URL}/api/players?league=${league}&season=${season}${sourceParam}`;
       // Fetch large batch for client-side sorting/pagination
@@ -189,8 +191,9 @@ function Players({ league, season, conferences, sourceParam = '' }) {
       const response = await fetch(url);
       const data = await response.json();
       setRawPlayers(data.players || []);
-    } catch (error) {
-      console.error('Error fetching players:', error);
+    } catch (err) {
+      console.error('Error fetching players:', err);
+      setError('Failed to load player data. Please try again.');
       setRawPlayers([]);
     } finally {
       setLoading(false);
@@ -464,7 +467,9 @@ function Players({ league, season, conferences, sourceParam = '' }) {
             Export CSV
           </button>
         </div>
-        {loading ? (
+        {error ? (
+          <div className="error-banner">{error}</div>
+        ) : loading ? (
           <SkeletonLoader variant="table" rows={10} />
         ) : (
           <div className="players-table-container">

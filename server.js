@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const morgan = require('morgan');
 const { startScheduler } = require('./scheduler');
 
 // Route modules
@@ -24,6 +25,9 @@ if (process.env.NODE_ENV === 'production') {
   app.use(cors());
 }
 app.use(express.json());
+
+// Request logging — concise in production, detailed in dev
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Cache API responses for 5 minutes (data refreshes every 4 hours)
 app.use('/api', (req, res, next) => {
@@ -56,7 +60,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
   // Start automated task scheduler in production
@@ -66,3 +70,28 @@ app.listen(PORT, () => {
     console.log('Scheduler disabled in development (set NODE_ENV=production to enable)');
   }
 });
+
+// Graceful shutdown — let in-flight requests finish & close the DB pool
+function gracefulShutdown(signal) {
+  console.log(`\n${signal} received — shutting down gracefully...`);
+  server.close(() => {
+    console.log('HTTP server closed.');
+    const { pool } = require('./db/pool');
+    pool.end().then(() => {
+      console.log('Database pool closed.');
+      process.exit(0);
+    }).catch((err) => {
+      console.error('Error closing DB pool:', err);
+      process.exit(1);
+    });
+  });
+
+  // Force exit after 10 seconds if graceful shutdown stalls
+  setTimeout(() => {
+    console.error('Graceful shutdown timed out — forcing exit.');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

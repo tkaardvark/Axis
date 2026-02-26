@@ -25,7 +25,6 @@
  */
 
 require('dotenv').config();
-const { Pool } = require('pg');
 const {
   getBoxScoreUrlsForDate,
   getAllGameDates,
@@ -57,22 +56,17 @@ const TO_DATE = getArg('to', null);
 const ALL = hasFlag('all');
 
 /**
- * Get an ISO date string for today or yesterday in US Eastern time
+ * Get an ISO date string for today (or offset days) in US Eastern time.
+ * Uses the Intl API to correctly handle DST transitions.
  */
 function getDateString(offsetDays = 0) {
   const d = new Date();
-  // Approximate US Eastern: UTC-5 (close enough for date boundaries)
-  d.setHours(d.getHours() - 5);
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  // toLocaleDateString with en-CA gives YYYY-MM-DD format in the target timezone
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('render.com')
-    ? { rejectUnauthorized: false }
-    : false,
-});
+const { pool } = require('../db/pool');
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -96,11 +90,13 @@ async function processBatch(items, batchSize, fn) {
 }
 
 /**
- * Insert a parsed box score into the database (gets its own connection from pool)
+ * Insert a parsed box score into the database (gets its own connection from pool).
+ * Uses a transaction so game + player stats + PBP either all save or none do.
  */
 async function insertBoxScore(parsed) {
   const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { game, players, plays } = parsed;
 
     // Fallback: resolve null team IDs by matching name to teams table
@@ -244,8 +240,16 @@ async function insertBoxScore(parsed) {
         $19, $20, $21, $22, $23, $24, $25, $26, $27
       )
       ON CONFLICT (box_score_url, player_id, season) DO UPDATE SET
-        minutes = EXCLUDED.minutes, fgm = EXCLUDED.fgm, fga = EXCLUDED.fga,
-        pts = EXCLUDED.pts
+        player_name = EXCLUDED.player_name,
+        team_name = EXCLUDED.team_name, team_id = EXCLUDED.team_id,
+        is_home = EXCLUDED.is_home, is_starter = EXCLUDED.is_starter,
+        minutes = EXCLUDED.minutes,
+        fgm = EXCLUDED.fgm, fga = EXCLUDED.fga,
+        fgm3 = EXCLUDED.fgm3, fga3 = EXCLUDED.fga3,
+        ftm = EXCLUDED.ftm, fta = EXCLUDED.fta,
+        oreb = EXCLUDED.oreb, dreb = EXCLUDED.dreb, reb = EXCLUDED.reb,
+        ast = EXCLUDED.ast, stl = EXCLUDED.stl, blk = EXCLUDED.blk,
+        turnovers = EXCLUDED.turnovers, pf = EXCLUDED.pf, pts = EXCLUDED.pts
     `, [
       gameId, game.boxScoreUrl, game.season,
       player.playerName, player.playerUrl, player.playerId, player.uniformNumber,
@@ -256,26 +260,32 @@ async function insertBoxScore(parsed) {
     ]);
   }
 
-  // Insert play-by-play (batch insert for performance)
+  // Insert play-by-play in batches
   if (plays.length > 0) {
-    const pbpValues = [];
-    const pbpParams = [];
-    let paramIdx = 1;
+    // Resolve team_id for each play based on is_home flag
+    const homeTeamId = game.home.id || null;
+    const awayTeamId = game.away.id || null;
 
-    for (const play of plays) {
-      pbpValues.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
-      pbpParams.push(
-        gameId, game.boxScoreUrl, game.season,
-        play.period, play.gameClock, play.sequenceNumber,
-        play.teamName, play.isHome, play.playerName,
-        play.actionText, play.actionType, play.isScoringPlay,
-        play.awayScore,
-      );
-      // homeScore handled separately due to parameter limit
-    }
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < plays.length; i += BATCH_SIZE) {
+      const batch = plays.slice(i, i + BATCH_SIZE);
+      const values = [];
+      const placeholders = [];
+      let paramIdx = 1;
 
-    // Simplified: insert PBP row by row for reliability (batch for perf later)
-    for (const play of plays) {
+      for (const play of batch) {
+        const teamId = play.isHome ? homeTeamId : awayTeamId;
+        placeholders.push(`($${paramIdx}, $${paramIdx+1}, $${paramIdx+2}, $${paramIdx+3}, $${paramIdx+4}, $${paramIdx+5}, $${paramIdx+6}, $${paramIdx+7}, $${paramIdx+8}, $${paramIdx+9}, $${paramIdx+10}, $${paramIdx+11}, $${paramIdx+12}, $${paramIdx+13}, $${paramIdx+14})`);
+        values.push(
+          gameId, game.boxScoreUrl, game.season,
+          play.period, play.gameClock, play.sequenceNumber,
+          play.teamName, teamId, play.isHome, play.playerName,
+          play.actionText, play.actionType, play.isScoringPlay,
+          play.awayScore, play.homeScore,
+        );
+        paramIdx += 15;
+      }
+
       await client.query(`
         INSERT INTO exp_play_by_play (
           game_box_score_id, box_score_url, season,
@@ -283,18 +293,16 @@ async function insertBoxScore(parsed) {
           team_name, team_id, is_home, player_name,
           action_text, action_type, is_scoring_play,
           away_score, home_score
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      `, [
-        gameId, game.boxScoreUrl, game.season,
-        play.period, play.gameClock, play.sequenceNumber,
-        play.teamName, null, play.isHome, play.playerName,
-        play.actionText, play.actionType, play.isScoringPlay,
-        play.awayScore, play.homeScore,
-      ]);
+        ) VALUES ${placeholders.join(', ')}
+      `, values);
     }
   }
 
+  await client.query('COMMIT');
   return { gameId, players: players.length, plays: plays.length };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
   } finally {
     client.release();
   }
@@ -362,36 +370,57 @@ async function processBoxScore(gameMeta, gameDate) {
 }
 
 /**
- * Post-import: mark is_naia_game on all exp_game_box_scores for a season.
+ * Post-import: mark is_naia_game on all exp_game_box_scores for a season+league.
  * A game is NAIA when both teams exist in the `teams` table and are not excluded.
  * Also marks is_neutral by cross-referencing the legacy `games` table.
+ *
+ * Scoped to a specific league to avoid race conditions when men's and women's
+ * imports run concurrently.
  */
-async function markNaiaGames(season) {
-  console.log('\n🏀 Marking NAIA games & neutral sites...');
+async function markNaiaGames(season, league) {
+  console.log(`\n🏀 Marking NAIA games & neutral sites (${league || 'all'})...`);
   const client = await pool.connect();
   try {
-    // Reset to false first
-    await client.query(`
-      UPDATE exp_game_box_scores SET is_naia_game = false WHERE season = $1
-    `, [season]);
+    // Reset to false — scoped to league if provided to avoid clearing other league's tags
+    if (league) {
+      await client.query(`
+        UPDATE exp_game_box_scores SET is_naia_game = false WHERE season = $1 AND league = $2
+      `, [season, league]);
+    } else {
+      await client.query(`
+        UPDATE exp_game_box_scores SET is_naia_game = false WHERE season = $1
+      `, [season]);
+    }
 
     // Mark NAIA: both teams exist in teams table and neither is excluded
+    const naiaParams = [season];
+    let naiaLeagueFilter = '';
+    if (league) {
+      naiaLeagueFilter = ' AND e.league = $2';
+      naiaParams.push(league);
+    }
     const naiaResult = await client.query(`
       UPDATE exp_game_box_scores e
       SET is_naia_game = true
       FROM teams t_away, teams t_home
       WHERE e.season = $1
-        AND e.is_exhibition = false
+        AND e.is_exhibition = false${naiaLeagueFilter}
         AND t_away.team_id = e.away_team_id AND t_away.season = $1 AND t_away.is_excluded = false
         AND t_home.team_id = e.home_team_id AND t_home.season = $1 AND t_home.is_excluded = false
-    `, [season]);
+    `, naiaParams);
 
     // Mark neutral sites from legacy games table (while it still exists)
+    const neutralParams = [season];
+    let neutralLeagueFilter = '';
+    if (league) {
+      neutralLeagueFilter = ' AND e.league = $2';
+      neutralParams.push(league);
+    }
     const neutralResult = await client.query(`
       UPDATE exp_game_box_scores e
       SET is_neutral = true
       WHERE e.season = $1
-        AND e.is_neutral = false
+        AND e.is_neutral = false${neutralLeagueFilter}
         AND EXISTS (
           SELECT 1 FROM games g
           JOIN teams t ON g.team_id = t.team_id AND t.season = $1
@@ -400,7 +429,7 @@ async function markNaiaGames(season) {
             AND g.game_date = e.game_date
             AND (t.name = e.home_team_name OR t.name = e.away_team_name)
         )
-    `, [season]);
+    `, neutralParams);
 
     console.log(`   NAIA games: ${naiaResult.rowCount}`);
     console.log(`   Neutral sites: ${neutralResult.rowCount}`);
@@ -510,7 +539,7 @@ async function main() {
 
     // Post-import: mark NAIA games and neutral sites
     if (!DRY_RUN && totalGames > 0) {
-      await markNaiaGames(SEASON);
+      await markNaiaGames(SEASON, LEAGUE);
       // Refresh pre-calculated team stats from box score data
       await refreshTeamStats(SEASON, LEAGUE);
     }

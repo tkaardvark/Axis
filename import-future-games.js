@@ -12,7 +12,6 @@
  */
 
 require('dotenv').config();
-const { Pool } = require('pg');
 const https = require('https');
 const fs = require('fs');
 
@@ -26,12 +25,7 @@ const TEAM_URLS_FILE = `team-urls-${SEASON}.json`;
 const CONCURRENT_REQUESTS = 5;
 const DELAY_BETWEEN_BATCHES = 300;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('render.com')
-    ? { rejectUnauthorized: false }
-    : false,
-});
+const { pool } = require('./db/pool');
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {

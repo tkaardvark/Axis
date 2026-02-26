@@ -26,7 +26,8 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
   } = filters;
 
   // Build game-level WHERE filters applied to the exp table (before flattening)
-  const expFilters = [`e.season = '${season.replace(/'/g, "''")}'`];
+  // Season is parameterized as $1 to prevent SQL injection
+  const expFilters = [`e.season = $1`];
   
   // Exclude exhibition games (matches is_naia_game filter in original)
   expFilters.push('e.is_exhibition = false');
@@ -55,8 +56,8 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
   const expWhereClause = expFilters.join(' AND ');
 
   // Build conference filter
-  const params = [league];
-  let paramIndex = 2;
+  const params = [season, league];
+  let paramIndex = 3;
   let conferenceClause = '';
   if (conference && conference !== 'All Conferences') {
     conferenceClause = `AND t.conference = $${paramIndex}`;
@@ -119,7 +120,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
       FROM exp_game_box_scores e
       JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
       WHERE ${expWhereClause}
-        AND t.league = $1
+        AND t.league = $2
 
       UNION ALL
 
@@ -168,7 +169,7 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
       FROM exp_game_box_scores e
       JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
       WHERE ${expWhereClause}
-        AND t.league = $1
+        AND t.league = $2
     )`;
 
   // Build game_stats CTE — aggregate the flattened rows
@@ -348,8 +349,8 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
     LEFT JOIN team_ratings tr ON t.team_id = tr.team_id
       AND tr.season = t.season
       AND tr.date_calculated = (SELECT MAX(date_calculated) FROM team_ratings WHERE season = t.season)
-    WHERE t.league = $1
-    AND t.season = '${season.replace(/'/g, "''")}'
+    WHERE t.league = $2
+    AND t.season = $1
     AND t.is_excluded = FALSE
     ${conferenceClause}
     ORDER BY adjusted_net_rating DESC NULLS LAST
@@ -460,15 +461,15 @@ function buildAggregateSelects(alias) {
           AVG(${g}.ties) as avg_ties,
           AVG(${g}.largest_lead) as avg_largest_lead,
           AVG(${g}.opp_largest_lead) as avg_opp_largest_lead,
-          -- Close/blowout/halftime records
-          SUM(CASE WHEN ABS(${g}.team_score - ${g}.opponent_score) <= 5 AND ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as close_wins,
-          SUM(CASE WHEN ABS(${g}.team_score - ${g}.opponent_score) <= 5 AND ${g}.team_score < ${g}.opponent_score THEN 1 ELSE 0 END) as close_losses,
-          SUM(CASE WHEN (${g}.team_score - ${g}.opponent_score) >= 15 THEN 1 ELSE 0 END) as blowout_wins,
-          SUM(CASE WHEN (${g}.opponent_score - ${g}.team_score) >= 15 THEN 1 ELSE 0 END) as blowout_losses,
-          SUM(CASE WHEN ${g}.team_half1_score > ${g}.opp_half1_score AND ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as half_lead_wins,
-          SUM(CASE WHEN ${g}.team_half1_score > ${g}.opp_half1_score THEN 1 ELSE 0 END) as half_lead_games,
-          SUM(CASE WHEN ${g}.team_half1_score < ${g}.opp_half1_score AND ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as comeback_wins,
-          SUM(CASE WHEN ${g}.team_half1_score < ${g}.opp_half1_score THEN 1 ELSE 0 END) as trailing_half_games`;
+          -- Close/blowout/halftime records (exclude forfeits — scores are artificial)
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND ABS(${g}.team_score - ${g}.opponent_score) <= 5 AND ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as close_wins,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND ABS(${g}.team_score - ${g}.opponent_score) <= 5 AND ${g}.team_score < ${g}.opponent_score THEN 1 ELSE 0 END) as close_losses,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND (${g}.team_score - ${g}.opponent_score) >= 15 THEN 1 ELSE 0 END) as blowout_wins,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND (${g}.opponent_score - ${g}.team_score) >= 15 THEN 1 ELSE 0 END) as blowout_losses,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND ${g}.team_half1_score > ${g}.opp_half1_score AND ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as half_lead_wins,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND ${g}.team_half1_score > ${g}.opp_half1_score THEN 1 ELSE 0 END) as half_lead_games,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND ${g}.team_half1_score < ${g}.opp_half1_score AND ${g}.team_score > ${g}.opponent_score THEN 1 ELSE 0 END) as comeback_wins,
+          SUM(CASE WHEN ${g}.forfeit_team_id IS NULL AND ${g}.team_half1_score < ${g}.opp_half1_score THEN 1 ELSE 0 END) as trailing_half_games`;
 }
 
 /**

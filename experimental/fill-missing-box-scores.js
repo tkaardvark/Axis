@@ -29,7 +29,7 @@
  */
 
 require('dotenv').config();
-const { Pool } = require('pg');
+const { pool: sharedPool } = require('../db/pool');
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
@@ -59,37 +59,30 @@ const CLI_DRY_RUN = hasFlag('dry-run');
 const CLI_LOOKBACK = getArg('lookback', null);
 const CLI_JOB_NAME = getArg('job-name', 'cli');
 
-function createPool() {
-  return new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes('render.com')
-      ? { rejectUnauthorized: false }
-      : false,
-  });
-}
-
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
- * Get an ISO date string in US Eastern time with an offset in days
+ * Get an ISO date string in US Eastern time with an offset in days.
+ * Uses the Intl API to correctly handle DST transitions.
  */
 function getDateStringET(offsetDays = 0) {
   const d = new Date();
-  d.setHours(d.getHours() - 5); // Approximate US Eastern: UTC-5
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  // toLocaleDateString with en-CA gives YYYY-MM-DD format in the target timezone
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
 /**
- * Fetch JSON from an S3 URL
+ * Fetch JSON from an S3 URL.
+ * Includes a 30-second timeout to prevent hanging on unresponsive servers.
  */
-function fetchJson(url) {
+function fetchJson(url, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
+    const req = https.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchJson(res.headers.location).then(resolve).catch(reject);
+        return fetchJson(res.headers.location, timeoutMs).then(resolve).catch(reject);
       }
       if (res.statusCode !== 200) {
         return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
@@ -104,7 +97,11 @@ function fetchJson(url) {
         }
       });
       res.on('error', reject);
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Request timed out after ${timeoutMs}ms: ${url}`));
+    });
   });
 }
 
@@ -125,7 +122,9 @@ function getTeamS3Urls(league, season) {
 
 /**
  * Get all box score filenames from a team's S3 JSON data.
- * Returns array of filenames like "20251115_8vaz.xml".
+ * Returns array of filenames like "20251115_8vaz.xml" plus a metadata map
+ * with game type flags (conference, exhibition, postseason, etc.) extracted
+ * from the S3 JSON event data.
  * Only includes events with status "Final" (completed games).
  */
 async function getBoxScoreUrlsFromS3(s3Url) {
@@ -134,6 +133,7 @@ async function getBoxScoreUrlsFromS3(s3Url) {
   const events = json.events || [];
 
   const urls = [];
+  const urlMeta = {};
   for (const eventData of events) {
     const bsl = eventData.boxScoreLink;
     if (!bsl) continue;
@@ -143,9 +143,20 @@ async function getBoxScoreUrlsFromS3(s3Url) {
     if (!status.startsWith('Final')) continue;
 
     urls.push(bsl);
+
+    // Extract game type metadata from the S3 event data
+    const ev = eventData.event || {};
+    urlMeta[bsl] = {
+      isConference: ev.conference === true,
+      isDivision: ev.division === true,
+      isPostseason: ev.postseason === true,
+      isExhibition: ev.eventType?.code === 'exhibition'
+        || ev.eventType?.statsCount === false,
+      isNeutral: typeof ev.neutralSite === 'string' && ev.neutralSite.length > 0,
+    };
   }
 
-  return { teamName, urls };
+  return { teamName, urls, urlMeta };
 }
 
 /**
@@ -235,7 +246,7 @@ async function logImport(pool, entry) {
  * Fetch, parse, and import a single box score URL (gap-fill version)
  */
 async function processGapFillBoxScore(boxScoreUrl, season, league, opts = {}) {
-  const { dryRun = false, pool: extPool, jobName, lookbackDays } = opts;
+  const { dryRun = false, pool: extPool, jobName, lookbackDays, gameMeta } = opts;
   const gameDate = dateFromFilename(boxScoreUrl.split('/').pop());
   const fullUrl = boxScoreUrl.startsWith('http')
     ? boxScoreUrl
@@ -258,28 +269,45 @@ async function processGapFillBoxScore(boxScoreUrl, season, league, opts = {}) {
     return null;
   }
 
-  // We don't have scoreboard metadata for game type, so default everything to false.
-  // The markNaiaGames() post-step will fix is_naia_game and is_neutral.
-  // Conference/exhibition/postseason flags will remain false — the scoreboard
-  // importer will overwrite them if/when the game gets linked on the scoreboard.
-  parsed.game.isConference = false;
-  parsed.game.isDivision = false;
-  parsed.game.isExhibition = false;
-  parsed.game.isPostseason = false;
-  parsed.game.isNeutral = false;
+  // Use S3 JSON metadata for game type flags when available.
+  // Falls back to false if no metadata (e.g., URL not found in any team's S3 data).
+  // markNaiaGames() post-step will still fix is_naia_game and is_neutral.
+  if (gameMeta) {
+    parsed.game.isConference = gameMeta.isConference || false;
+    parsed.game.isDivision = gameMeta.isDivision || false;
+    parsed.game.isExhibition = gameMeta.isExhibition || false;
+    parsed.game.isPostseason = gameMeta.isPostseason || false;
+    parsed.game.isNeutral = gameMeta.isNeutral || false;
+  } else {
+    parsed.game.isConference = false;
+    parsed.game.isDivision = false;
+    parsed.game.isExhibition = false;
+    parsed.game.isPostseason = false;
+    parsed.game.isNeutral = false;
+  }
 
   // Derive is_national_tournament for late-March games
   const gd = new Date(gameDate + 'T00:00:00Z');
-  parsed.game.isNationalTournament = gd.getUTCMonth() === 2 && gd.getUTCDate() >= 12;
+  parsed.game.isNationalTournament = parsed.game.isPostseason
+    && gd.getUTCMonth() === 2 && gd.getUTCDate() >= 12;
+
+  // Build flags label for display
+  const flags = [];
+  if (parsed.game.isExhibition) flags.push('EXH');
+  if (parsed.game.isConference) flags.push('CONF');
+  if (parsed.game.isDivision) flags.push('DIV');
+  if (parsed.game.isPostseason) flags.push('POST');
+  if (parsed.game.isNeutral) flags.push('NEUT');
+  const flagStr = flags.length > 0 ? ` [${flags.join(',')}]` : '';
 
   if (dryRun) {
-    console.log(`  📋 ${parsed.game.away.name} ${parsed.game.away.score} @ ${parsed.game.home.name} ${parsed.game.home.score}`);
+    console.log(`  📋 ${parsed.game.away.name} ${parsed.game.away.score} @ ${parsed.game.home.name} ${parsed.game.home.score}${flagStr}`);
     console.log(`     Players: ${parsed.players.length} | Plays: ${parsed.plays.length}`);
     return parsed;
   }
 
   const result = await insertBoxScore(parsed);
-  console.log(`  ✅ [gap-fill] ${parsed.game.away.name} ${parsed.game.away.score} @ ${parsed.game.home.name} ${parsed.game.home.score} (${result.players} players, ${result.plays} plays)`);
+  console.log(`  ✅ [gap-fill] ${parsed.game.away.name} ${parsed.game.away.score} @ ${parsed.game.home.name} ${parsed.game.home.score}${flagStr} (${result.players} players, ${result.plays} plays)`);
 
   // Log successful import
   if (extPool) {
@@ -321,9 +349,8 @@ async function fillMissingBoxScores(options = {}) {
     jobName = 'cli',
   } = options;
 
-  // Use provided pool or create a new one
-  const ownPool = !options.pool;
-  const pool = options.pool || createPool();
+  // Use provided pool or the shared pool
+  const pool = options.pool || sharedPool;
 
   const summary = {
     teamsScraped: 0,
@@ -357,7 +384,7 @@ async function fillMissingBoxScores(options = {}) {
 
     // Step 2: Fetch all team JSONs and collect box score URLs
     console.log('Fetching team S3 data for box score URLs...');
-    const allBoxScoreFiles = new Set();
+    const allBoxScoreFiles = new Map(); // filename → game metadata
 
     for (let i = 0; i < teamUrls.length; i += concurrency) {
       const batch = teamUrls.slice(i, i + concurrency);
@@ -374,7 +401,10 @@ async function fillMissingBoxScores(options = {}) {
               const fileDate = dateFromFilename(file);
               if (!fileDate || fileDate < cutoffDate) continue;
             }
-            allBoxScoreFiles.add(file);
+            // Store metadata from S3 JSON (first team's data wins for duplicates)
+            if (!allBoxScoreFiles.has(file)) {
+              allBoxScoreFiles.set(file, r.value.urlMeta[file] || null);
+            }
           }
           summary.teamsScraped++;
         } else {
@@ -415,13 +445,13 @@ async function fillMissingBoxScores(options = {}) {
 
     // Step 4: Find missing
     const missingFiles = [];
-    for (const file of allBoxScoreFiles) {
+    for (const [file, meta] of allBoxScoreFiles) {
       if (!existingFiles.has(file)) {
-        missingFiles.push(file);
+        missingFiles.push({ file, meta });
       }
     }
 
-    missingFiles.sort();
+    missingFiles.sort((a, b) => a.file.localeCompare(b.file));
     summary.missingFound = missingFiles.length;
 
     if (missingFiles.length === 0) {
@@ -430,9 +460,16 @@ async function fillMissingBoxScores(options = {}) {
     }
 
     console.log(`Found ${missingFiles.length} missing box scores:\n`);
-    for (const file of missingFiles) {
+    for (const { file, meta } of missingFiles) {
       const date = dateFromFilename(file);
-      console.log(`  ${date}  ${file}`);
+      const flags = [];
+      if (meta?.isConference) flags.push('CONF');
+      if (meta?.isDivision) flags.push('DIV');
+      if (meta?.isExhibition) flags.push('EXH');
+      if (meta?.isPostseason) flags.push('POST');
+      if (meta?.isNeutral) flags.push('NEUT');
+      const flagStr = flags.length > 0 ? ` [${flags.join(',')}]` : '';
+      console.log(`  ${date}  ${file}${flagStr}`);
     }
     console.log('');
 
@@ -446,11 +483,11 @@ async function fillMissingBoxScores(options = {}) {
     for (let i = 0; i < missingFiles.length; i += concurrency) {
       const batch = missingFiles.slice(i, i + concurrency);
       const results = await Promise.allSettled(
-        batch.map(file => {
+        batch.map(({ file, meta }) => {
           const sport = LEAGUE_PATHS[league];
           const fullUrl = `${BASE_URL}/sports/${sport}/${season}/boxscores/${file}`;
           return processGapFillBoxScore(fullUrl, season, league, {
-            dryRun, pool, jobName, lookbackDays,
+            dryRun, pool, jobName, lookbackDays, gameMeta: meta,
           });
         })
       );
@@ -465,8 +502,9 @@ async function fillMissingBoxScores(options = {}) {
           console.log(`  ❌ Error: ${r.reason?.message}`);
           // Log the error
           if (!dryRun) {
+            const batchItem = batch[results.indexOf(r)];
             await logImport(pool, {
-              boxScoreUrl: batch[results.indexOf(r)] || 'unknown',
+              boxScoreUrl: batchItem?.file || 'unknown',
               season, league, gameDate: null,
               source: 'gap-fill', jobName, lookbackDays,
               status: 'error', errorMessage: r.reason?.message,
@@ -497,7 +535,7 @@ async function fillMissingBoxScores(options = {}) {
 
     // Post-import: mark NAIA games and refresh stats
     if (!dryRun && summary.imported > 0) {
-      await markNaiaGames(season);
+      await markNaiaGames(season, league);
       await refreshTeamStats(season, league);
     }
 
@@ -507,9 +545,7 @@ async function fillMissingBoxScores(options = {}) {
     console.error('Fatal error:', err);
     throw err;
   } finally {
-    if (ownPool) {
-      await pool.end();
-    }
+    // Pool lifecycle managed by caller or process exit
   }
 }
 
@@ -527,6 +563,7 @@ if (require.main === module) {
   })
     .then((summary) => {
       if (summary.errors > 0) process.exit(1);
+      return sharedPool.end();
     })
     .catch((err) => {
       console.error('Fatal error:', err);
