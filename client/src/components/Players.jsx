@@ -313,7 +313,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
       case 'rating2':
         return parseFloat(value).toFixed(2);
       case 'pct1':
-        return `${parseFloat(value).toFixed(1)}%`;
+        return `${(parseFloat(value) * 100).toFixed(1)}%`;
       default:
         return value;
     }
