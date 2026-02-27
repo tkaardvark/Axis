@@ -9,7 +9,10 @@ const { resolveSource } = require('./dataSource');
  * has no losses — meaning every other participant has been eliminated.
  * 
  * This avoids false positives from early rounds (quarterfinals/semis) or
- * tournaments with staggered bye structures.
+ * tournaments with staggered bye structures. Additionally, the candidate
+ * must have at least 2 wins — this prevents false champions when only
+ * some first-round games have been imported (a single-game winner would
+ * appear to be the sole undefeated team).
  *
  * @param {Pool} pool - PostgreSQL connection pool
  * @param {string} league - 'mens' or 'womens'
@@ -47,13 +50,14 @@ async function getConferenceChampions(pool, league, season, source) {
         undefeated AS (
           -- Teams still alive (no tournament losses)
           -- Count how many undefeated teams remain per conference
-          SELECT team_id, conference,
+          SELECT team_id, conference, wins,
                  COUNT(*) OVER (PARTITION BY conference) as alive_count
           FROM team_records
           WHERE losses = 0
         )
-        -- Champion = the sole undefeated team in a conference
-        SELECT team_id FROM undefeated WHERE alive_count = 1
+        -- Champion = the sole undefeated team in a conference, with at least 2 wins
+        -- (2-win minimum prevents false positives from partially-imported early rounds)
+        SELECT team_id FROM undefeated WHERE alive_count = 1 AND wins >= 2
       `, [league, season]);
     } else {
       result = await pool.query(`
@@ -76,12 +80,12 @@ async function getConferenceChampions(pool, league, season, source) {
           GROUP BY team_id, conference
         ),
         undefeated AS (
-          SELECT team_id, conference,
+          SELECT team_id, conference, wins,
                  COUNT(*) OVER (PARTITION BY conference) as alive_count
           FROM team_records
           WHERE losses = 0
         )
-        SELECT team_id FROM undefeated WHERE alive_count = 1
+        SELECT team_id FROM undefeated WHERE alive_count = 1 AND wins >= 2
       `, [league, season]);
     }
 
