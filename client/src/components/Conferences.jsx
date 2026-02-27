@@ -100,7 +100,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
   const [sortColumn, setSortColumn] = useState('conf_wins');
   const [sortDirection, setSortDirection] = useState('desc');
   const [rankSortColumn, setRankSortColumn] = useState('adj_net_rank');
-  const [rankSortDirection, setRankSortDirection] = useState('asc');
+  const [rankSortDirection, setRankSortDirection] = useState('desc');
 
 
   // Sync URL param
@@ -249,7 +249,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
       const bVal = getSortValue(b);
       // For stats where lower is better
       const lowerIsBetter = ['rpi_rank', 'adjusted_defensive_rating', 'conf_losses', 'losses'].includes(sortColumn);
-      const dir = sortDirection === 'desc' ? -1 : 1;
+      const dir = sortDirection === 'desc' ? 1 : -1;
       if (lowerIsBetter) {
         return (aVal - bVal) * dir;
       }
@@ -355,7 +355,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
       const aVal = getValue(a);
       const bVal = getValue(b);
       const lowerIsBetter = ['adj_net_rank', 'avg_adj_drtg', 'best_rpi_rank'].includes(rankSortColumn);
-      const dir = rankSortDirection === 'desc' ? -1 : 1;
+      const dir = rankSortDirection === 'desc' ? 1 : -1;
       if (lowerIsBetter) return (aVal - bVal) * dir;
       return (bVal - aVal) * dir;
     });
@@ -432,9 +432,8 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
       setRankSortDirection(d => d === 'desc' ? 'asc' : 'desc');
     } else {
       setRankSortColumn(column);
-      // Default direction based on column
-      const defaultAsc = ['adj_net_rank', 'avg_adj_drtg', 'best_rpi_rank'].includes(column);
-      setRankSortDirection(defaultAsc ? 'asc' : 'desc');
+      // Default to desc (best first) for all columns
+      setRankSortDirection('desc');
     }
   };
 
