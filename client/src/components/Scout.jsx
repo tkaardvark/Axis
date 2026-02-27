@@ -114,7 +114,7 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
   const [loading, setLoading] = useState(false);
   const [statGroup, setStatGroup] = useState('Overview');
   const [lineupSort, setLineupSort] = useState({ column: 'gamesStarted', direction: 'desc' });
-  const [lineupStatsSort, setLineupStatsSort] = useState({ column: 'plusMinus', direction: 'desc' });
+  const [lineupStatsSort, setLineupStatsSort] = useState({ column: 'netPer100', direction: 'desc' });
   const [boxScoreGameId, setBoxScoreGameId] = useState(null);
 
   // Update URL when tab changes
@@ -369,15 +369,21 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
     return sorted;
   }, [lineups, lineupSort]);
 
-  // Sorted 5-man lineup stats
+  // Sorted 5-man lineup stats with net rating computed
   const sortedLineupStats = useMemo(() => {
     if (!lineupStats.length) return [];
-    const sorted = [...lineupStats].sort((a, b) => {
+    // Compute net rating (+/- per 100 possessions) for each lineup
+    const enriched = lineupStats.map(l => ({
+      ...l,
+      netPer100: l.possessions > 0 ? (l.plusMinus / l.possessions) * 100 : 0,
+    }));
+    const sorted = enriched.sort((a, b) => {
       let aVal, bVal;
       switch (lineupStatsSort.column) {
         case 'pointsScored': aVal = a.pointsScored; bVal = b.pointsScored; break;
         case 'pointsAllowed': aVal = a.pointsAllowed; bVal = b.pointsAllowed; break;
         case 'possessions': aVal = a.possessions; bVal = b.possessions; break;
+        case 'netPer100': aVal = a.netPer100; bVal = b.netPer100; break;
         default: aVal = a.plusMinus; bVal = b.plusMinus;
       }
       return lineupStatsSort.direction === 'desc' ? bVal - aVal : aVal - bVal;
@@ -894,6 +900,9 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
                 <table className="scout-lineups-table lineup-stats-table sortable-table">
                   <thead>
                     <tr>
+                      <th className="col-net100 sortable-header" onClick={() => toggleLineupStatsSort('netPer100')}>
+                        NET {lineupStatsSort.column === 'netPer100' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
                       <th className="col-plusminus sortable-header" onClick={() => toggleLineupStatsSort('plusMinus')}>
                         +/- {lineupStatsSort.column === 'plusMinus' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
                       </th>
@@ -912,6 +921,9 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
                   <tbody>
                     {sortedLineupStats.map((lineup, idx) => (
                       <tr key={idx}>
+                        <td className={`col-net100 ${lineup.netPer100 >= 0 ? 'positive' : 'negative'}`}>
+                          {lineup.netPer100 >= 0 ? '+' : ''}{lineup.netPer100.toFixed(1)}
+                        </td>
                         <td className={`col-plusminus ${lineup.plusMinus >= 0 ? 'positive' : 'negative'}`}>
                           {lineup.plusMinus >= 0 ? '+' : ''}{lineup.plusMinus}
                         </td>

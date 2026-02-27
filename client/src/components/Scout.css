@@ -1332,11 +1332,21 @@
   font-weight: 700;
 }
 
-.scout-lineups-table .col-plusminus.positive {
+.scout-lineups-table .col-net100 {
+  width: 75px;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.scout-lineups-table .col-plusminus.positive,
+.scout-lineups-table .col-net100.positive {
   color: var(--color-success);
 }
 
-.scout-lineups-table .col-plusminus.negative {
+.scout-lineups-table .col-plusminus.negative,
+.scout-lineups-table .col-net100.negative {
   color: var(--color-error);
 }
 
@@ -1351,6 +1361,7 @@
 
 /* Header alignment to match data columns */
 .scout-lineups-table th.col-plusminus,
+.scout-lineups-table th.col-net100,
 .scout-lineups-table th.col-pts,
 .scout-lineups-table th.col-poss {
   text-align: center;
