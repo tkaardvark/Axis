@@ -55,7 +55,7 @@ async function getConferenceChampions(pool, league, season, source) {
         championship_dates AS (
           SELECT conference, MAX(game_date) as champ_date
           FROM continuous_tournament
-          WHERE teams_playing >= 2
+          WHERE teams_playing = 2
           GROUP BY conference
         ),
         championship_winners AS (
@@ -109,10 +109,10 @@ async function getConferenceChampions(pool, league, season, source) {
         WHERE prev_date IS NULL OR (game_date - prev_date) <= 4
       ),
       championship_dates AS (
-        -- Find the last date with 2+ teams within the continuous main tournament
+        -- Championship date must have exactly 2 teams (a single final game)
         SELECT conference, MAX(game_date) as champ_date
         FROM continuous_tournament
-        WHERE teams_playing >= 2
+        WHERE teams_playing = 2
         GROUP BY conference
       ),
       championship_winners AS (
