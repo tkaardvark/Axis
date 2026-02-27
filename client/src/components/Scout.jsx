@@ -901,7 +901,7 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
                   <thead>
                     <tr>
                       <th className="col-net100 sortable-header" onClick={() => toggleLineupStatsSort('netPer100')}>
-                        NET {lineupStatsSort.column === 'netPer100' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                        +/- per 100 {lineupStatsSort.column === 'netPer100' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
                       </th>
                       <th className="col-plusminus sortable-header" onClick={() => toggleLineupStatsSort('plusMinus')}>
                         +/- {lineupStatsSort.column === 'plusMinus' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
