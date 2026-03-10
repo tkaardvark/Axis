@@ -60,7 +60,7 @@ const LOWER_IS_BETTER = new Set([
   'rpi_rank', 'pcr', 'pr', 'sos_rank'
 ]);
 
-function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
+function Bracketcast({ league, season, onTeamClick, sourceParam = '', embedded = false }) {
   const [data, setData] = useState({ teams: [], bracket: {}, pods: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -223,10 +223,12 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
 
   if (loading) {
     return (
-      <main className="main-content bracketcast-page">
-        <div className="page-header">
-          <h1>Bracketcast</h1>
-        </div>
+      <main className={`main-content bracketcast-page ${embedded ? 'bracketcast-embedded' : ''}`}>
+        {!embedded && (
+          <div className="page-header">
+            <h1>Bracketcast</h1>
+          </div>
+        )}
         <SkeletonLoader variant="table" rows={12} />
       </main>
     );
@@ -234,21 +236,25 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '' }) {
 
   if (error) {
     return (
-      <main className="main-content bracketcast-page">
-        <div className="page-header">
-          <h1>Bracketcast</h1>
-        </div>
+      <main className={`main-content bracketcast-page ${embedded ? 'bracketcast-embedded' : ''}`}>
+        {!embedded && (
+          <div className="page-header">
+            <h1>Bracketcast</h1>
+          </div>
+        )}
         <div className="error-banner">{error}</div>
       </main>
     );
   }
 
   return (
-    <main className="main-content bracketcast-page">
-      <div className="page-header">
-        <h1>Bracketcast</h1>
-        <p className="page-subtitle">Selection committee criteria rankings and projected 64-team national tournament bracket</p>
-      </div>
+    <main className={`main-content bracketcast-page ${embedded ? 'bracketcast-embedded' : ''}`}>
+      {!embedded && (
+        <div className="page-header">
+          <h1>Bracketcast</h1>
+          <p className="page-subtitle">Selection committee criteria rankings and projected 64-team national tournament bracket</p>
+        </div>
+      )}
 
       <div className="page-tabs">
           <button

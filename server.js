@@ -12,6 +12,7 @@ const playersRoutes = require('./routes/players');
 const conferencesRoutes = require('./routes/conferences');
 const matchupRoutes = require('./routes/matchup');
 const bracketcastRoutes = require('./routes/bracketcast');
+const tournamentRoutes = require('./routes/tournament');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -52,6 +53,7 @@ app.use(playersRoutes);
 app.use(conferencesRoutes);
 app.use(matchupRoutes);
 app.use(bracketcastRoutes);
+app.use(tournamentRoutes);
 
 // Serve React app for all other routes in production
 if (process.env.NODE_ENV === 'production') {

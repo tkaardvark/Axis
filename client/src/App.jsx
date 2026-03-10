@@ -13,12 +13,12 @@ import { API_URL } from './utils/api';
 import './App.css';
 
 // Lazy-load secondary page components for code splitting
-const Bracketcast = lazy(() => import('./components/Bracketcast'));
 const Insights = lazy(() => import('./components/Insights'));
 const Scout = lazy(() => import('./components/Scout'));
 const Players = lazy(() => import('./components/Players'));
 const Conferences = lazy(() => import('./components/Conferences'));
 const Methodology = lazy(() => import('./components/Methodology'));
+const Tournament = lazy(() => import('./components/Tournament'));
 
 // Default values for URL params
 const DEFAULTS = {
@@ -123,7 +123,8 @@ function App() {
   const getCurrentPage = () => {
     const path = location.pathname;
     if (path.startsWith('/conferences')) return 'conferences';
-    if (path.startsWith('/bracketcast')) return 'bracketcast';
+    if (path.startsWith('/bracketcast')) return 'tournament';
+    if (path.startsWith('/tournament')) return 'tournament';
     if (path.startsWith('/scout')) return 'scout';
     if (path.startsWith('/methodology')) return 'methodology';
     if (path.startsWith('/players')) return 'players';
@@ -379,17 +380,7 @@ function App() {
                 />
               }
             />
-            <Route
-              path="/bracketcast"
-              element={
-                <Bracketcast
-                  league={league}
-                  season={season}
-                  onTeamClick={handleTeamClick}
-                  sourceParam={sourceParam}
-                />
-              }
-            />
+            <Route path="/bracketcast" element={<Navigate to="/tournament" replace />} />
             <Route
               path="/scout"
               element={
@@ -409,6 +400,17 @@ function App() {
                   league={league}
                   season={season}
                   conferences={conferences}
+                  sourceParam={sourceParam}
+                />
+              }
+            />
+            <Route
+              path="/tournament"
+              element={
+                <Tournament
+                  league={league}
+                  season={season}
+                  onTeamClick={handleTeamClick}
                   sourceParam={sourceParam}
                 />
               }

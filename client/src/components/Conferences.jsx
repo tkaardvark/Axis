@@ -524,7 +524,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
     <main className="main-content conferences-page">
       <div className="page-header">
         <h1>Conferences</h1>
-        <p className="page-subtitle">Conference breakdown, standings, and cross-team analysis</p>
+        <p className="page-subtitle">Conference power rankings, standings, and head-to-head breakdowns across the division</p>
       </div>
 
       {error && <div className="error-banner">{error}</div>}
