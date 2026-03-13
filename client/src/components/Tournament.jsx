@@ -13,6 +13,8 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
   const [error, setError] = useState(null);
   const [view, setView] = useState('bracket'); // 'bracket', 'pods', 'rankings', 'bracketcast'
   const [expandedPod, setExpandedPod] = useState(null);
+  const [predictionMethod, setPredictionMethod] = useState('none'); // 'none', 'score', 'rpi', 'netRating', 'powerIndex'
+  const predictionMode = predictionMethod !== 'none';
 
   useEffect(() => {
     const fetchTournament = async () => {
@@ -58,34 +60,73 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
     return 'Favorable';
   };
 
+  // Build a lookup of actual results: key = sorted team id pair → result
+  const actualResultsMap = useMemo(() => {
+    if (!data?.actualResults) return {};
+    const map = {};
+    data.actualResults.forEach(r => {
+      const key = [r.homeTeamId, r.awayTeamId].sort().join('-');
+      map[key] = r;
+    });
+    return map;
+  }, [data]);
+
+  // Check if a predicted matchup has an actual result
+  const getActualResult = useCallback((teamA, teamB) => {
+    if (!teamA || !teamB) return null;
+    const key = [teamA.teamId, teamB.teamId].sort().join('-');
+    return actualResultsMap[key] || null;
+  }, [actualResultsMap]);
+
   // Build bracket tree from quadrant data for the visual bracket view
   const bracketTree = useMemo(() => {
     if (!data?.quadrants) return null;
 
-    // Build per-quadrant first two rounds from pod structure
-    // Each pod: seed 1 vs 16 (Game 1), seed 8 vs 9 (Game 2) → winners play Second Round
+    const preds = predictionMode ? data.predictions[predictionMethod] : null;
+
     const buildQuadrant = (quadrant) => {
       const firstRound = [];
       const secondRound = [];
+      const qPred = preds?.[quadrant.name];
 
-      quadrant.pods.forEach((pod) => {
-        // Game 1: teams[0] (top seed) vs teams[3] (bottom seed)
+      quadrant.pods.forEach((pod, podIdx) => {
         firstRound.push({ top: pod.teams[0], bottom: pod.teams[3], location: `${pod.hostCity}, ${pod.hostState}` });
-        // Game 2: teams[1] vs teams[2]
         firstRound.push({ top: pod.teams[1], bottom: pod.teams[2], location: `${pod.hostCity}, ${pod.hostState}` });
-        // Second round: Game 1 winner vs Game 2 winner
-        secondRound.push({ top: null, bottom: null, location: `${pod.hostCity}, ${pod.hostState}` });
+
+        if (qPred) {
+          const g1 = qPred.firstRound[podIdx * 2];
+          const g2 = qPred.firstRound[podIdx * 2 + 1];
+          // Add scores to first round games if available (score prediction method)
+          if (g1.scores) firstRound[firstRound.length - 2].predictedScores = g1.scores;
+          if (g2.scores) firstRound[firstRound.length - 1].predictedScores = g2.scores;
+          const sr = qPred.secondRound[podIdx];
+          secondRound.push({
+            top: sr.top, bottom: sr.bottom, location: `${pod.hostCity}, ${pod.hostState}`,
+            predictedScores: sr.scores,
+          });
+        } else {
+          secondRound.push({ top: null, bottom: null, location: `${pod.hostCity}, ${pod.hostState}` });
+        }
       });
 
-      // Round of 16: 2 games per quadrant (pod 1 winner vs pod 2 winner, pod 3 winner vs pod 4 winner)
-      const sweet16 = [
-        { top: null, bottom: null, location: `${data.finalSite?.city}, ${data.finalSite?.state}` },
-        { top: null, bottom: null, location: `${data.finalSite?.city}, ${data.finalSite?.state}` },
-      ];
-      // Quarterfinal: 1 game per quadrant
-      const quarterFinal = [
-        { top: null, bottom: null, location: `${data.finalSite?.city}, ${data.finalSite?.state}` },
-      ];
+      const finalSiteLoc = `${data.finalSite?.city}, ${data.finalSite?.state}`;
+
+      let sweet16, quarterFinal;
+      if (qPred) {
+        sweet16 = qPred.sweet16.map(g => ({
+          top: g.top, bottom: g.bottom, location: finalSiteLoc, predictedScores: g.scores,
+        }));
+        quarterFinal = [{
+          top: qPred.quarterFinal.top, bottom: qPred.quarterFinal.bottom,
+          location: finalSiteLoc, predictedScores: qPred.quarterFinal.scores,
+        }];
+      } else {
+        sweet16 = [
+          { top: null, bottom: null, location: finalSiteLoc },
+          { top: null, bottom: null, location: finalSiteLoc },
+        ];
+        quarterFinal = [{ top: null, bottom: null, location: finalSiteLoc }];
+      }
 
       return { name: quadrant.name, firstRound, secondRound, sweet16, quarterFinal };
     };
@@ -95,16 +136,28 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
       quadrants[q.name] = buildQuadrant(q);
     });
 
-    return {
-      quadrants,
-      semiFinals: [
+    let semiFinals, championship;
+    if (preds) {
+      semiFinals = preds.semiFinals.map((s, i) => ({
+        top: s.top, bottom: s.bottom,
+        label: i === 0 ? 'Naismith vs Cramer' : 'Duer vs Liston',
+        predictedScores: s.scores,
+      }));
+      championship = {
+        top: preds.championship.top, bottom: preds.championship.bottom,
+        predictedScores: preds.championship.scores,
+        winner: preds.championship.winner,
+      };
+    } else {
+      semiFinals = [
         { top: null, bottom: null, label: 'Naismith vs Cramer' },
         { top: null, bottom: null, label: 'Duer vs Liston' },
-      ],
-      championship: { top: null, bottom: null },
-      finalSite: data.finalSite,
-    };
-  }, [data]);
+      ];
+      championship = { top: null, bottom: null };
+    }
+
+    return { quadrants, semiFinals, championship, finalSite: data.finalSite };
+  }, [data, predictionMethod]);
 
   const handleTeamClickInBracket = useCallback((team) => {
     if (team && onTeamClick) {
@@ -167,6 +220,27 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
         </div>
       </div>
 
+      {view === 'bracket' && (
+        <div className="prediction-selector">
+          <label className="prediction-selector-label">Predict Bracket:</label>
+          <select
+            className="prediction-select"
+            value={predictionMethod}
+            onChange={(e) => setPredictionMethod(e.target.value)}
+          >
+            <option value="none">No Predictions</option>
+            <option value="score">Score Prediction</option>
+            <option value="mayhem">Mayhem Mode</option>
+            <option value="rpi">RPI</option>
+            <option value="netRating">Adjusted Net Rating</option>
+            <option value="powerIndex">Power Index</option>
+          </select>
+          {predictionMethod === 'mayhem' && (
+            <span className="prediction-description">Probability-based upsets using real results for completed games. Locked in for the entire tournament.</span>
+          )}
+        </div>
+      )}
+
       {view === 'bracket' && bracketTree ? (
         <FullBracket
           bracketTree={bracketTree}
@@ -174,6 +248,9 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
           podRankings={podRankings}
           getDifficultyClass={getDifficultyClass}
           onTeamClick={handleTeamClickInBracket}
+          predictionMode={predictionMode}
+          predictionMethod={predictionMethod}
+          getActualResult={getActualResult}
         />
       ) : view === 'pods' ? (
         <div className="tournament-pods-view">
@@ -294,14 +371,13 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
                       {pod.teams.map((team) => (
                         <div
                           key={team.teamId}
-                          className={`ranking-team-row ${team.isHost ? 'host' : ''}`}
+                          className="ranking-team-row"
                           onClick={() => onTeamClick?.({ team_id: team.teamId, name: team.name })}
                         >
                           <span className="rt-seed">#{team.seed}</span>
                           <span className="rt-team">
                             <TeamLogo logoUrl={team.logoUrl} teamName={team.name} />
                             {team.name}
-                            {team.isHost && <span className="host-tag">HOST</span>}
                           </span>
                           <span className="rt-conf">{team.conference}</span>
                           <span className="rt-record">{team.record}</span>
@@ -310,7 +386,7 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
                           <span className="rt-sos">{team.sos?.toFixed(4) || '-'}</span>
                           <span className="rt-q1">{team.q1}</span>
                           <span className="rt-distance">
-                            {team.isHost ? '—' : team.distance != null ? `${team.distance} mi` : '?'}
+                            {team.distance != null ? `${team.distance} mi` : '?'}
                           </span>
                         </div>
                       ))}
@@ -339,21 +415,22 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
 /* ============================================
    FULL BRACKET - Visual 64-team tournament tree
    ============================================ */
-function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTeamClick }) {
-  // Left side: Naismith (top) + Cramer (bottom)
-  // Right side: Duer (top) + Liston (bottom)
-  // They converge to semis and then championship in the center
+function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTeamClick, predictionMode, predictionMethod, getActualResult }) {
   const leftQuadrants = ['Naismith', 'Cramer'];
   const rightQuadrants = ['Duer', 'Liston'];
 
   return (
     <div className="full-bracket">
       <div className="bracket-header-legend">
-        <span className="legend-item"><span className="legend-dot host-dot"></span> Host</span>
         <span className="legend-item"><span className="legend-dot final-dot"></span> Final Site</span>
+        {predictionMode && (
+          <>
+            <span className="legend-item"><span className="legend-dot correct-dot"></span> Correct Pick</span>
+            <span className="legend-item"><span className="legend-dot wrong-dot"></span> Wrong Pick</span>
+          </>
+        )}
       </div>
 
-      {/* LEFT HALF: Naismith + Cramer → flows right to center */}
       <div className="bracket-half bracket-left">
         {leftQuadrants.map((qName) => {
           const q = bracketTree.quadrants[qName];
@@ -366,12 +443,14 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
               podRankings={podRankings}
               getDifficultyClass={getDifficultyClass}
               onTeamClick={onTeamClick}
+              predictionMode={predictionMode}
+              predictionMethod={predictionMethod}
+              getActualResult={getActualResult}
             />
           );
         })}
       </div>
 
-      {/* CENTER: Semis + Championship */}
       <div className="bracket-center">
         <div className="bracket-final-site">
           {data.finalSite?.city}, {data.finalSite?.state}
@@ -379,31 +458,81 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
         <div className="bracket-center-rounds">
           <div className="bracket-semi">
             <div className="round-label">Semifinal</div>
-            <BracketSlot label={`${leftQuadrants[0]} Winner`} side="center" />
-            <div className="bracket-connector-v"></div>
-            <BracketSlot label={`${leftQuadrants[1]} Winner`} side="center" />
+            {predictionMode && bracketTree.semiFinals[0]?.top ? (
+              <BracketGame
+                game={bracketTree.semiFinals[0]}
+                side="center"
+                onTeamClick={onTeamClick}
+                predictionMode={predictionMode}
+                predictionMethod={predictionMethod}
+                getActualResult={getActualResult}
+                isCenter={true}
+              />
+            ) : (
+              <>
+                <BracketSlot label={`${leftQuadrants[0]} Winner`} />
+                <div className="bracket-connector-v"></div>
+                <BracketSlot label={`${leftQuadrants[1]} Winner`} />
+              </>
+            )}
           </div>
 
           <div className="bracket-championship">
             <div className="round-label">Championship</div>
             <div className="championship-game">
-              <BracketSlot label="Semifinal 1 Winner" side="center" />
-              <div className="championship-vs">VS</div>
-              <BracketSlot label="Semifinal 2 Winner" side="center" />
+              {predictionMode && bracketTree.championship?.top ? (
+                <>
+                  <BracketGame
+                    game={bracketTree.championship}
+                    side="center"
+                    onTeamClick={onTeamClick}
+                    predictionMode={predictionMode}
+                    predictionMethod={predictionMethod}
+                    getActualResult={getActualResult}
+                    isCenter={true}
+                  />
+                  {bracketTree.championship.winner && (
+                    <div className="predicted-champion">
+                      <div className="champion-crown">🏆</div>
+                      <TeamLogo logoUrl={bracketTree.championship.winner.logoUrl} teamName={bracketTree.championship.winner.name} />
+                      <span className="champion-name">{bracketTree.championship.winner.name}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <BracketSlot label="Semifinal 1 Winner" />
+                  <div className="championship-vs">VS</div>
+                  <BracketSlot label="Semifinal 2 Winner" />
+                </>
+              )}
             </div>
-            <div className="champion-label">NAIA {data.quadrants?.[0] ? '' : ''}National Champion</div>
+            <div className="champion-label">NAIA National Champion</div>
           </div>
 
           <div className="bracket-semi">
             <div className="round-label">Semifinal</div>
-            <BracketSlot label={`${rightQuadrants[0]} Winner`} side="center" />
-            <div className="bracket-connector-v"></div>
-            <BracketSlot label={`${rightQuadrants[1]} Winner`} side="center" />
+            {predictionMode && bracketTree.semiFinals[1]?.top ? (
+              <BracketGame
+                game={bracketTree.semiFinals[1]}
+                side="center"
+                onTeamClick={onTeamClick}
+                predictionMode={predictionMode}
+                predictionMethod={predictionMethod}
+                getActualResult={getActualResult}
+                isCenter={true}
+              />
+            ) : (
+              <>
+                <BracketSlot label={`${rightQuadrants[0]} Winner`} />
+                <div className="bracket-connector-v"></div>
+                <BracketSlot label={`${rightQuadrants[1]} Winner`} />
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* RIGHT HALF: Duer + Liston → flows left to center */}
       <div className="bracket-half bracket-right">
         {rightQuadrants.map((qName) => {
           const q = bracketTree.quadrants[qName];
@@ -416,6 +545,9 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
               podRankings={podRankings}
               getDifficultyClass={getDifficultyClass}
               onTeamClick={onTeamClick}
+              predictionMode={predictionMode}
+              predictionMethod={predictionMethod}
+              getActualResult={getActualResult}
             />
           );
         })}
@@ -424,13 +556,12 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
   );
 }
 
-/* One quadrant's bracket: 8 first-round games → 4 second-round → 2 sweet 16 → 1 QF */
-function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTeamClick }) {
+/* One quadrant's bracket */
+function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTeamClick, predictionMode, predictionMethod, getActualResult }) {
   return (
     <div className={`quadrant-bracket quadrant-bracket-${side}`}>
       <div className="quadrant-bracket-label">{quadrant.name} Quadrant</div>
       <div className="quadrant-rounds">
-        {/* Round 1: 8 games (within pods) */}
         <div className="bracket-round bracket-round-1">
           <div className="round-label">First Round</div>
           {quadrant.firstRound.map((game, i) => (
@@ -440,11 +571,13 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               side={side}
               onTeamClick={onTeamClick}
               showLocation={i % 2 === 0}
+              predictionMode={predictionMode}
+              predictionMethod={predictionMethod}
+              getActualResult={getActualResult}
             />
           ))}
         </div>
 
-        {/* Round 2: 4 games (pod finals) */}
         <div className="bracket-round bracket-round-2">
           <div className="round-label">Second Round</div>
           {quadrant.secondRound.map((game, i) => (
@@ -453,13 +586,15 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               game={game}
               side={side}
               onTeamClick={onTeamClick}
-              isEmpty={true}
+              isEmpty={!predictionMode || !game.top}
               location={game.location}
+              predictionMode={predictionMode}
+              predictionMethod={predictionMethod}
+              getActualResult={getActualResult}
             />
           ))}
         </div>
 
-        {/* Sweet 16: 2 games */}
         <div className="bracket-round bracket-round-3">
           <div className="round-label">Round of 16</div>
           {quadrant.sweet16.map((game, i) => (
@@ -468,12 +603,14 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               game={game}
               side={side}
               onTeamClick={onTeamClick}
-              isEmpty={true}
+              isEmpty={!predictionMode || !game.top}
+              predictionMode={predictionMode}
+              predictionMethod={predictionMethod}
+              getActualResult={getActualResult}
             />
           ))}
         </div>
 
-        {/* Quarterfinal: 1 game */}
         <div className="bracket-round bracket-round-4">
           <div className="round-label">Quarterfinal</div>
           {quadrant.quarterFinal.map((game, i) => (
@@ -482,7 +619,10 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               game={game}
               side={side}
               onTeamClick={onTeamClick}
-              isEmpty={true}
+              isEmpty={!predictionMode || !game.top}
+              predictionMode={predictionMode}
+              predictionMethod={predictionMethod}
+              getActualResult={getActualResult}
             />
           ))}
         </div>
@@ -492,15 +632,33 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
 }
 
 /* A single bracket game: two team slots with optional connector */
-function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location }) {
+function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location, predictionMode, predictionMethod, getActualResult, isCenter }) {
   const locText = location || game?.location;
+  const showScores = predictionMethod === 'score' || predictionMethod === 'mayhem';
+
+  // Determine prediction status for each slot
+  let topStatus = null, bottomStatus = null;
+  if (predictionMode && game?.top && game?.bottom && getActualResult) {
+    const actual = getActualResult(game.top, game.bottom);
+    if (actual) {
+      // We have an actual result for this matchup
+      topStatus = actual.winnerId === game.top.teamId ? 'correct' : 'wrong';
+      bottomStatus = actual.winnerId === game.bottom.teamId ? 'correct' : 'wrong';
+    }
+  }
+
+  const topScore = showScores && game?.predictedScores && game?.top
+    ? game.predictedScores[game.top.teamId] : null;
+  const bottomScore = showScores && game?.predictedScores && game?.bottom
+    ? game.predictedScores[game.bottom.teamId] : null;
+
   return (
-    <div className="bracket-game">
+    <div className={`bracket-game ${isCenter ? 'bracket-game-center' : ''}`}>
       {(showLocation || location) && locText && (
         <div className="bracket-game-location">{locText}</div>
       )}
       <div className="bracket-game-matchup">
-        <div className={`bracket-game-slot top-slot ${game?.top?.isHost ? 'host-slot' : ''}`}
+        <div className={`bracket-game-slot top-slot ${topStatus ? `prediction-${topStatus}` : ''}`}
           onClick={() => game?.top && onTeamClick(game.top)}
         >
           {isEmpty || !game?.top ? (
@@ -510,11 +668,12 @@ function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location 
               <span className="bracket-seed">#{game.top.seed}</span>
               <TeamLogo logoUrl={game.top.logoUrl} teamName={game.top.name} />
               <span className="bracket-team-name">{game.top.name}</span>
-              <span className="bracket-record">{game.top.record}</span>
+              {topScore != null && <span className="bracket-projected-score">{topScore}</span>}
+              {!topScore && <span className="bracket-record">{game.top.record}</span>}
             </>
           )}
         </div>
-        <div className={`bracket-game-slot bottom-slot ${game?.bottom?.isHost ? 'host-slot' : ''}`}
+        <div className={`bracket-game-slot bottom-slot ${bottomStatus ? `prediction-${bottomStatus}` : ''}`}
           onClick={() => game?.bottom && onTeamClick(game.bottom)}
         >
           {isEmpty || !game?.bottom ? (
@@ -524,7 +683,8 @@ function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location 
               <span className="bracket-seed">#{game.bottom.seed}</span>
               <TeamLogo logoUrl={game.bottom.logoUrl} teamName={game.bottom.name} />
               <span className="bracket-team-name">{game.bottom.name}</span>
-              <span className="bracket-record">{game.bottom.record}</span>
+              {bottomScore != null && <span className="bracket-projected-score">{bottomScore}</span>}
+              {!bottomScore && <span className="bracket-record">{game.bottom.record}</span>}
             </>
           )}
         </div>
@@ -546,7 +706,7 @@ function PodTeamRow({ team, onTeamClick }) {
   if (!team) return null;
   return (
     <div
-      className={`pod-team-row ${team.isHost ? 'host' : ''}`}
+      className="pod-team-row"
       onClick={() => onTeamClick?.({ team_id: team.teamId, name: team.name })}
     >
       <span className="pod-team-seed">#{team.seed}</span>
@@ -554,7 +714,6 @@ function PodTeamRow({ team, onTeamClick }) {
       <div className="pod-team-details">
         <span className="pod-team-name">
           {team.name}
-          {team.isHost && <span className="host-tag">HOST</span>}
         </span>
         <span className="pod-team-meta">
           {team.record} • RPI: {team.rpiRank || '-'} • {team.conference}
@@ -562,7 +721,7 @@ function PodTeamRow({ team, onTeamClick }) {
       </div>
       <div className="pod-team-stats">
         <span className="pod-stat">{team.rpi?.toFixed(4) || '-'}</span>
-        {!team.isHost && team.distance != null && (
+        {team.distance != null && (
           <span className="pod-team-distance">{team.distance} mi</span>
         )}
       </div>
