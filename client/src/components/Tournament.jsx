@@ -84,6 +84,15 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
 
     const preds = predictionMode ? data.predictions[predictionMethod] : null;
 
+    // Advance a game using actual results, returning the winner team object or null
+    const advanceByActuals = (teamA, teamB) => {
+      if (!teamA || !teamB) return null;
+      const key = [teamA.teamId, teamB.teamId].sort().join('-');
+      const actual = actualResultsMap[key];
+      if (!actual) return null;
+      return actual.winnerId === teamA.teamId ? teamA : teamB;
+    };
+
     const buildQuadrant = (quadrant) => {
       const firstRound = [];
       const secondRound = [];
@@ -96,16 +105,21 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
         if (qPred) {
           const g1 = qPred.firstRound[podIdx * 2];
           const g2 = qPred.firstRound[podIdx * 2 + 1];
-          // Add scores to first round games if available (score prediction method)
           if (g1.scores) firstRound[firstRound.length - 2].predictedScores = g1.scores;
           if (g2.scores) firstRound[firstRound.length - 1].predictedScores = g2.scores;
+          firstRound[firstRound.length - 2].predictedWinnerId = g1.winner?.teamId;
+          firstRound[firstRound.length - 1].predictedWinnerId = g2.winner?.teamId;
           const sr = qPred.secondRound[podIdx];
           secondRound.push({
             top: sr.top, bottom: sr.bottom, location: `${pod.hostCity}, ${pod.hostState}`,
             predictedScores: sr.scores,
+            predictedWinnerId: sr.winner?.teamId,
           });
         } else {
-          secondRound.push({ top: null, bottom: null, location: `${pod.hostCity}, ${pod.hostState}` });
+          // No predictions — use actual results to advance teams
+          const g1W = advanceByActuals(pod.teams[0], pod.teams[3]);
+          const g2W = advanceByActuals(pod.teams[1], pod.teams[2]);
+          secondRound.push({ top: g1W || null, bottom: g2W || null, location: `${pod.hostCity}, ${pod.hostState}` });
         }
       });
 
@@ -115,17 +129,32 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
       if (qPred) {
         sweet16 = qPred.sweet16.map(g => ({
           top: g.top, bottom: g.bottom, location: finalSiteLoc, predictedScores: g.scores,
+          predictedWinnerId: g.winner?.teamId,
         }));
         quarterFinal = [{
           top: qPred.quarterFinal.top, bottom: qPred.quarterFinal.bottom,
           location: finalSiteLoc, predictedScores: qPred.quarterFinal.scores,
+          predictedWinnerId: qPred.quarterFinal.winner?.teamId,
         }];
       } else {
-        sweet16 = [
+        // No predictions — advance using actuals through later rounds
+        const s16Teams = [];
+        for (let i = 0; i < secondRound.length; i += 2) {
+          const a = secondRound[i].top && secondRound[i].bottom
+            ? advanceByActuals(secondRound[i].top, secondRound[i].bottom) : null;
+          const b = secondRound[i + 1]?.top && secondRound[i + 1]?.bottom
+            ? advanceByActuals(secondRound[i + 1].top, secondRound[i + 1].bottom) : null;
+          s16Teams.push({ top: a, bottom: b, location: finalSiteLoc });
+        }
+        sweet16 = s16Teams.length > 0 ? s16Teams : [
           { top: null, bottom: null, location: finalSiteLoc },
           { top: null, bottom: null, location: finalSiteLoc },
         ];
-        quarterFinal = [{ top: null, bottom: null, location: finalSiteLoc }];
+        const qfA = sweet16[0]?.top && sweet16[0]?.bottom
+          ? advanceByActuals(sweet16[0].top, sweet16[0].bottom) : null;
+        const qfB = sweet16[1]?.top && sweet16[1]?.bottom
+          ? advanceByActuals(sweet16[1].top, sweet16[1].bottom) : null;
+        quarterFinal = [{ top: qfA, bottom: qfB, location: finalSiteLoc }];
       }
 
       return { name: quadrant.name, firstRound, secondRound, sweet16, quarterFinal };
@@ -142,22 +171,39 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
         top: s.top, bottom: s.bottom,
         label: i === 0 ? 'Naismith vs Cramer' : 'Duer vs Liston',
         predictedScores: s.scores,
+        predictedWinnerId: s.winner?.teamId,
       }));
       championship = {
         top: preds.championship.top, bottom: preds.championship.bottom,
         predictedScores: preds.championship.scores,
+        predictedWinnerId: preds.championship.winner?.teamId,
         winner: preds.championship.winner,
       };
     } else {
+      // No predictions — advance using actuals
+      const qNames = data.quadrants.map(q => q.name);
+      const s1A = quadrants[qNames[0]]?.quarterFinal?.[0]?.top && quadrants[qNames[0]]?.quarterFinal?.[0]?.bottom
+        ? advanceByActuals(quadrants[qNames[0]].quarterFinal[0].top, quadrants[qNames[0]].quarterFinal[0].bottom) : null;
+      const s1B = quadrants[qNames[1]]?.quarterFinal?.[0]?.top && quadrants[qNames[1]]?.quarterFinal?.[0]?.bottom
+        ? advanceByActuals(quadrants[qNames[1]].quarterFinal[0].top, quadrants[qNames[1]].quarterFinal[0].bottom) : null;
+      const s2A = quadrants[qNames[2]]?.quarterFinal?.[0]?.top && quadrants[qNames[2]]?.quarterFinal?.[0]?.bottom
+        ? advanceByActuals(quadrants[qNames[2]].quarterFinal[0].top, quadrants[qNames[2]].quarterFinal[0].bottom) : null;
+      const s2B = quadrants[qNames[3]]?.quarterFinal?.[0]?.top && quadrants[qNames[3]]?.quarterFinal?.[0]?.bottom
+        ? advanceByActuals(quadrants[qNames[3]].quarterFinal[0].top, quadrants[qNames[3]].quarterFinal[0].bottom) : null;
       semiFinals = [
-        { top: null, bottom: null, label: 'Naismith vs Cramer' },
-        { top: null, bottom: null, label: 'Duer vs Liston' },
+        { top: s1A || null, bottom: s1B || null, label: 'Naismith vs Cramer' },
+        { top: s2A || null, bottom: s2B || null, label: 'Duer vs Liston' },
       ];
-      championship = { top: null, bottom: null };
+      const champA = semiFinals[0].top && semiFinals[0].bottom
+        ? advanceByActuals(semiFinals[0].top, semiFinals[0].bottom) : null;
+      const champB = semiFinals[1].top && semiFinals[1].bottom
+        ? advanceByActuals(semiFinals[1].top, semiFinals[1].bottom) : null;
+      const champWinner = champA && champB ? advanceByActuals(champA, champB) : null;
+      championship = { top: champA || null, bottom: champB || null, winner: champWinner || null };
     }
 
     return { quadrants, semiFinals, championship, finalSite: data.finalSite };
-  }, [data, predictionMethod]);
+  }, [data, predictionMethod, actualResultsMap]);
 
   const handleTeamClickInBracket = useCallback((team) => {
     if (team && onTeamClick) {
@@ -458,7 +504,7 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
         <div className="bracket-center-rounds">
           <div className="bracket-semi">
             <div className="round-label">Semifinal</div>
-            {predictionMode && bracketTree.semiFinals[0]?.top ? (
+            {bracketTree.semiFinals[0]?.top ? (
               <BracketGame
                 game={bracketTree.semiFinals[0]}
                 side="center"
@@ -480,7 +526,7 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
           <div className="bracket-championship">
             <div className="round-label">Championship</div>
             <div className="championship-game">
-              {predictionMode && bracketTree.championship?.top ? (
+              {bracketTree.championship?.top ? (
                 <>
                   <BracketGame
                     game={bracketTree.championship}
@@ -512,7 +558,7 @@ function FullBracket({ bracketTree, data, podRankings, getDifficultyClass, onTea
 
           <div className="bracket-semi">
             <div className="round-label">Semifinal</div>
-            {predictionMode && bracketTree.semiFinals[1]?.top ? (
+            {bracketTree.semiFinals[1]?.top ? (
               <BracketGame
                 game={bracketTree.semiFinals[1]}
                 side="center"
@@ -586,7 +632,7 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               game={game}
               side={side}
               onTeamClick={onTeamClick}
-              isEmpty={!predictionMode || !game.top}
+              isEmpty={!game.top}
               location={game.location}
               predictionMode={predictionMode}
               predictionMethod={predictionMethod}
@@ -603,7 +649,7 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               game={game}
               side={side}
               onTeamClick={onTeamClick}
-              isEmpty={!predictionMode || !game.top}
+              isEmpty={!game.top}
               predictionMode={predictionMode}
               predictionMethod={predictionMethod}
               getActualResult={getActualResult}
@@ -619,7 +665,7 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
               game={game}
               side={side}
               onTeamClick={onTeamClick}
-              isEmpty={!predictionMode || !game.top}
+              isEmpty={!game.top}
               predictionMode={predictionMode}
               predictionMethod={predictionMethod}
               getActualResult={getActualResult}
@@ -634,23 +680,38 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
 /* A single bracket game: two team slots with optional connector */
 function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location, predictionMode, predictionMethod, getActualResult, isCenter }) {
   const locText = location || game?.location;
-  const showScores = predictionMethod === 'score' || predictionMethod === 'mayhem';
+  const showPredScores = predictionMethod === 'score' || predictionMethod === 'mayhem';
 
-  // Determine prediction status for each slot
+  // Check for actual result
+  const actual = (game?.top && game?.bottom && getActualResult)
+    ? getActualResult(game.top, game.bottom) : null;
+
+  // Determine prediction status: only the predicted winner gets highlighted
   let topStatus = null, bottomStatus = null;
-  if (predictionMode && game?.top && game?.bottom && getActualResult) {
-    const actual = getActualResult(game.top, game.bottom);
-    if (actual) {
-      // We have an actual result for this matchup
-      topStatus = actual.winnerId === game.top.teamId ? 'correct' : 'wrong';
-      bottomStatus = actual.winnerId === game.bottom.teamId ? 'correct' : 'wrong';
+  if (predictionMode && actual) {
+    const predWinnerId = game.predictedWinnerId;
+    if (predWinnerId) {
+      if (predWinnerId === game.top.teamId) {
+        topStatus = actual.winnerId === game.top.teamId ? 'correct' : 'wrong';
+      } else if (predWinnerId === game.bottom.teamId) {
+        bottomStatus = actual.winnerId === game.bottom.teamId ? 'correct' : 'wrong';
+      }
     }
   }
 
-  const topScore = showScores && game?.predictedScores && game?.top
-    ? game.predictedScores[game.top.teamId] : null;
-  const bottomScore = showScores && game?.predictedScores && game?.bottom
-    ? game.predictedScores[game.bottom.teamId] : null;
+  // Show actual scores when game is played, or predicted scores in score/mayhem mode
+  let topScore = null, bottomScore = null;
+  if (actual && game?.top && game?.bottom) {
+    topScore = actual.homeTeamId === game.top.teamId ? actual.homeScore : actual.awayScore;
+    bottomScore = actual.homeTeamId === game.bottom.teamId ? actual.homeScore : actual.awayScore;
+  } else if (showPredScores && game?.predictedScores && game?.top) {
+    topScore = game.predictedScores[game.top.teamId] ?? null;
+    bottomScore = game?.bottom ? (game.predictedScores[game.bottom.teamId] ?? null) : null;
+  }
+
+  // Highlight the actual winner's score bold in no-prediction mode
+  const topIsActualWinner = actual && game?.top && actual.winnerId === game.top.teamId;
+  const bottomIsActualWinner = actual && game?.bottom && actual.winnerId === game.bottom.teamId;
 
   return (
     <div className={`bracket-game ${isCenter ? 'bracket-game-center' : ''}`}>
@@ -658,7 +719,7 @@ function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location,
         <div className="bracket-game-location">{locText}</div>
       )}
       <div className="bracket-game-matchup">
-        <div className={`bracket-game-slot top-slot ${topStatus ? `prediction-${topStatus}` : ''}`}
+        <div className={`bracket-game-slot top-slot ${topStatus ? `prediction-${topStatus}` : ''} ${topIsActualWinner ? 'actual-winner' : ''}`}
           onClick={() => game?.top && onTeamClick(game.top)}
         >
           {isEmpty || !game?.top ? (
@@ -668,12 +729,12 @@ function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location,
               <span className="bracket-seed">#{game.top.seed}</span>
               <TeamLogo logoUrl={game.top.logoUrl} teamName={game.top.name} />
               <span className="bracket-team-name">{game.top.name}</span>
-              {topScore != null && <span className="bracket-projected-score">{topScore}</span>}
-              {!topScore && <span className="bracket-record">{game.top.record}</span>}
+              {topScore != null && <span className={`bracket-projected-score ${actual ? 'actual-score' : ''}`}>{topScore}</span>}
+              {topScore == null && <span className="bracket-record">{game.top.record}</span>}
             </>
           )}
         </div>
-        <div className={`bracket-game-slot bottom-slot ${bottomStatus ? `prediction-${bottomStatus}` : ''}`}
+        <div className={`bracket-game-slot bottom-slot ${bottomStatus ? `prediction-${bottomStatus}` : ''} ${bottomIsActualWinner ? 'actual-winner' : ''}`}
           onClick={() => game?.bottom && onTeamClick(game.bottom)}
         >
           {isEmpty || !game?.bottom ? (
@@ -683,8 +744,8 @@ function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location,
               <span className="bracket-seed">#{game.bottom.seed}</span>
               <TeamLogo logoUrl={game.bottom.logoUrl} teamName={game.bottom.name} />
               <span className="bracket-team-name">{game.bottom.name}</span>
-              {bottomScore != null && <span className="bracket-projected-score">{bottomScore}</span>}
-              {!bottomScore && <span className="bracket-record">{game.bottom.record}</span>}
+              {bottomScore != null && <span className={`bracket-projected-score ${actual ? 'actual-score' : ''}`}>{bottomScore}</span>}
+              {bottomScore == null && <span className="bracket-record">{game.bottom.record}</span>}
             </>
           )}
         </div>

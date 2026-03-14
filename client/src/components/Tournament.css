@@ -906,6 +906,16 @@
   text-align: right;
 }
 
+/* Actual game results */
+.bracket-game-slot.actual-winner {
+  font-weight: 700;
+}
+
+.bracket-projected-score.actual-score {
+  color: var(--color-text-primary);
+  font-weight: 800;
+}
+
 /* Legend dots for prediction */
 .correct-dot {
   background-color: #22c55e;
