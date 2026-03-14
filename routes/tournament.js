@@ -281,6 +281,13 @@ router.get('/api/tournament', async (req, res) => {
       actualResultMap[key] = r;
     });
 
+    // Look up actual result between two teams (if game has been played)
+    const findActual = (a, b) => {
+      if (!a || !b) return null;
+      const key = [a.teamId, b.teamId].sort().join('-');
+      return actualResultMap[key] || null;
+    };
+
     // ── Predictions: simulate the entire bracket with multiple methods ──
 
     // Pick functions for each method
@@ -324,35 +331,51 @@ router.get('/api/tournament', async (req, res) => {
       return { [a.teamId]: aScore, [b.teamId]: bScore };
     };
 
-    // Generic bracket simulator. scoresFn(a, b, winner) receives the already-picked winner.
+    // Generic bracket simulator. Checks actual results: actual winners advance,
+    // predicted winners tracked separately for highlight comparison.
     const simulateBracket = (pickFn, scoresFn) => {
+      // Resolve a single game: call pickFn for the prediction, then check actuals
+      const resolveGame = (a, b) => {
+        const predicted = pickFn(a, b);
+        if (!a || !b) {
+          return { winner: predicted, predictedWinner: predicted, scores: undefined };
+        }
+        // Always call scoresFn to maintain RNG sequence (important for Mayhem)
+        const predictedScores = scoresFn?.(a, b, predicted);
+        const actual = findActual(a, b);
+        if (actual) {
+          const actualWinner = actual.winnerId === a.teamId ? a : b;
+          const actualScores = { [actual.homeTeamId]: actual.homeScore, [actual.awayTeamId]: actual.awayScore };
+          return { winner: actualWinner, predictedWinner: predicted, scores: actualScores };
+        }
+        return { winner: predicted, predictedWinner: predicted, scores: predictedScores };
+      };
+
       const preds = {};
       enrichedQuadrants.forEach(q => {
         const qPred = { firstRound: [], secondRound: [], sweet16: [], quarterFinal: null };
         q.pods.forEach(pod => {
           const g1Top = pod.teams[0], g1Bot = pod.teams[3];
           const g2Top = pod.teams[1], g2Bot = pod.teams[2];
-          const g1W = pickFn(g1Top, g1Bot);
-          const g2W = pickFn(g2Top, g2Bot);
-          qPred.firstRound.push({ winner: g1W, scores: scoresFn?.(g1Top, g1Bot, g1W) });
-          qPred.firstRound.push({ winner: g2W, scores: scoresFn?.(g2Top, g2Bot, g2W) });
+          qPred.firstRound.push(resolveGame(g1Top, g1Bot));
+          qPred.firstRound.push(resolveGame(g2Top, g2Bot));
         });
         for (let i = 0; i < qPred.firstRound.length; i += 2) {
           const a = qPred.firstRound[i].winner;
           const b = qPred.firstRound[i + 1].winner;
-          const w = pickFn(a, b);
-          qPred.secondRound.push({ winner: w, top: a, bottom: b, scores: scoresFn?.(a, b, w) });
+          const r = resolveGame(a, b);
+          qPred.secondRound.push({ ...r, top: a, bottom: b });
         }
         for (let i = 0; i < qPred.secondRound.length; i += 2) {
           const a = qPred.secondRound[i].winner;
           const b = qPred.secondRound[i + 1].winner;
-          const w = pickFn(a, b);
-          qPred.sweet16.push({ winner: w, top: a, bottom: b, scores: scoresFn?.(a, b, w) });
+          const r = resolveGame(a, b);
+          qPred.sweet16.push({ ...r, top: a, bottom: b });
         }
         const qfA = qPred.sweet16[0].winner;
         const qfB = qPred.sweet16[1].winner;
-        const qfW = pickFn(qfA, qfB);
-        qPred.quarterFinal = { winner: qfW, top: qfA, bottom: qfB, scores: scoresFn?.(qfA, qfB, qfW) };
+        const qf = resolveGame(qfA, qfB);
+        qPred.quarterFinal = { ...qf, top: qfA, bottom: qfB };
         preds[q.name] = qPred;
       });
 
@@ -361,18 +384,14 @@ router.get('/api/tournament', async (req, res) => {
       const s1B = preds[qNames[1]]?.quarterFinal?.winner;
       const s2A = preds[qNames[2]]?.quarterFinal?.winner;
       const s2B = preds[qNames[3]]?.quarterFinal?.winner;
-      const s1W = pickFn(s1A, s1B);
-      const s2W = pickFn(s2A, s2B);
+      const s1 = resolveGame(s1A, s1B);
+      const s2 = resolveGame(s2A, s2B);
       preds.semiFinals = [
-        { winner: s1W, top: s1A, bottom: s1B, scores: s1A && s1B ? scoresFn?.(s1A, s1B, s1W) : undefined },
-        { winner: s2W, top: s2A, bottom: s2B, scores: s2A && s2B ? scoresFn?.(s2A, s2B, s2W) : undefined },
+        { ...s1, top: s1A, bottom: s1B },
+        { ...s2, top: s2A, bottom: s2B },
       ];
-      const champW = pickFn(s1W, s2W);
-      preds.championship = {
-        winner: champW,
-        top: s1W, bottom: s2W,
-        scores: s1W && s2W ? scoresFn?.(s1W, s2W, champW) : undefined,
-      };
+      const champ = resolveGame(s1.winner, s2.winner);
+      preds.championship = { ...champ, top: s1.winner, bottom: s2.winner };
       return preds;
     };
 
@@ -394,13 +413,6 @@ router.get('/api/tournament', async (req, res) => {
       let t = Math.imul(rngState ^ rngState >>> 15, 1 | rngState);
       t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-
-    // Look up actual result between two teams (if game has been played)
-    const findActual = (a, b) => {
-      if (!a || !b) return null;
-      const key = [a.teamId, b.teamId].sort().join('-');
-      return actualResultMap[key] || null;
     };
 
     // Mayhem pick: use actual result if available, otherwise randomize

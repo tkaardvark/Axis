@@ -107,13 +107,13 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
           const g2 = qPred.firstRound[podIdx * 2 + 1];
           if (g1.scores) firstRound[firstRound.length - 2].predictedScores = g1.scores;
           if (g2.scores) firstRound[firstRound.length - 1].predictedScores = g2.scores;
-          firstRound[firstRound.length - 2].predictedWinnerId = g1.winner?.teamId;
-          firstRound[firstRound.length - 1].predictedWinnerId = g2.winner?.teamId;
+          firstRound[firstRound.length - 2].predictedWinnerId = g1.predictedWinner?.teamId;
+          firstRound[firstRound.length - 1].predictedWinnerId = g2.predictedWinner?.teamId;
           const sr = qPred.secondRound[podIdx];
           secondRound.push({
             top: sr.top, bottom: sr.bottom, location: `${pod.hostCity}, ${pod.hostState}`,
             predictedScores: sr.scores,
-            predictedWinnerId: sr.winner?.teamId,
+            predictedWinnerId: sr.predictedWinner?.teamId,
           });
         } else {
           // No predictions — use actual results to advance teams
@@ -129,12 +129,12 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
       if (qPred) {
         sweet16 = qPred.sweet16.map(g => ({
           top: g.top, bottom: g.bottom, location: finalSiteLoc, predictedScores: g.scores,
-          predictedWinnerId: g.winner?.teamId,
+          predictedWinnerId: g.predictedWinner?.teamId,
         }));
         quarterFinal = [{
           top: qPred.quarterFinal.top, bottom: qPred.quarterFinal.bottom,
           location: finalSiteLoc, predictedScores: qPred.quarterFinal.scores,
-          predictedWinnerId: qPred.quarterFinal.winner?.teamId,
+          predictedWinnerId: qPred.quarterFinal.predictedWinner?.teamId,
         }];
       } else {
         // No predictions — advance using actuals through later rounds
@@ -171,12 +171,12 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
         top: s.top, bottom: s.bottom,
         label: i === 0 ? 'Naismith vs Cramer' : 'Duer vs Liston',
         predictedScores: s.scores,
-        predictedWinnerId: s.winner?.teamId,
+        predictedWinnerId: s.predictedWinner?.teamId,
       }));
       championship = {
         top: preds.championship.top, bottom: preds.championship.bottom,
         predictedScores: preds.championship.scores,
-        predictedWinnerId: preds.championship.winner?.teamId,
+        predictedWinnerId: preds.championship.predictedWinner?.teamId,
         winner: preds.championship.winner,
       };
     } else {
