@@ -340,7 +340,6 @@ router.get('/api/tournament', async (req, res) => {
         if (!a || !b) {
           return { winner: predicted, predictedWinner: predicted, scores: undefined };
         }
-        // Always call scoresFn to maintain RNG sequence (important for Mayhem)
         const predictedScores = scoresFn?.(a, b, predicted);
         const actual = findActual(a, b);
         if (actual) {
@@ -401,61 +400,6 @@ router.get('/api/tournament', async (req, res) => {
       netRating: simulateBracket(pickByNetRating, null),
       powerIndex: simulateBracket(pickByPowerIndex, null),
     };
-
-    // "Mayhem" method: uses actual results for completed games,
-    // then seeded probability-based upsets for remaining games.
-    // Fixed seed = tournament start date (March 13, 2026) so picks are stable all tournament.
-    const mayhemSeed = 2026 * 10000 + 3 * 100 + 16; // 20260316
-    let rngState = mayhemSeed;
-    const seededRandom = () => {
-      // Simple mulberry32 PRNG
-      rngState |= 0; rngState = rngState + 0x6D2B79F5 | 0;
-      let t = Math.imul(rngState ^ rngState >>> 15, 1 | rngState);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-
-    // Mayhem pick: use actual result if available, otherwise randomize
-    const pickMayhem = (a, b) => {
-      if (!a) return b;
-      if (!b) return a;
-      const actual = findActual(a, b);
-      if (actual) {
-        // Consume a random number to keep RNG sequence consistent
-        seededRandom();
-        return actual.winnerId === a.teamId ? a : b;
-      }
-      const aEff = a.netEfficiency || 0;
-      const bEff = b.netEfficiency || 0;
-      const gap = Math.abs(aEff - bEff);
-      const favoriteProb = 0.75 + Math.min(gap * 0.02, 0.20);
-      const favorite = aEff >= bEff ? a : b;
-      const underdog = aEff >= bEff ? b : a;
-      return seededRandom() < favoriteProb ? favorite : underdog;
-    };
-
-    // Mayhem scores: use actual scores if available, otherwise generate
-    const mayhemScores = (a, b, winner) => {
-      const actual = findActual(a, b);
-      if (actual) {
-        // Consume a random number to keep RNG sequence consistent
-        seededRandom();
-        return { [actual.homeTeamId]: actual.homeScore, [actual.awayTeamId]: actual.awayScore };
-      }
-      const aEff = a.netEfficiency || 0;
-      const bEff = b.netEfficiency || 0;
-      const spread = (aEff - bEff) * 0.4;
-      const base = 72;
-      const noise = (seededRandom() - 0.5) * 8;
-      let aScore = Math.round(base + spread / 2 + noise);
-      let bScore = Math.round(base - spread / 2 - noise);
-      if (winner.teamId === a.teamId && aScore <= bScore) { aScore = bScore + 1; }
-      if (winner.teamId === b.teamId && bScore <= aScore) { bScore = aScore + 1; }
-      return { [a.teamId]: aScore, [b.teamId]: bScore };
-    };
-
-    rngState = mayhemSeed;
-    predictions.mayhem = simulateBracket(pickMayhem, mayhemScores);
 
     res.json({
       quadrants: enrichedQuadrants,

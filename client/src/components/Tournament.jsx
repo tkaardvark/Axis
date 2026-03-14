@@ -276,14 +276,10 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
           >
             <option value="none">No Predictions</option>
             <option value="score">Score Prediction</option>
-            <option value="mayhem">Mayhem Mode</option>
             <option value="rpi">RPI</option>
             <option value="netRating">Adjusted Net Rating</option>
             <option value="powerIndex">Power Index</option>
           </select>
-          {predictionMethod === 'mayhem' && (
-            <span className="prediction-description">Probability-based upsets using real results for completed games. Locked in for the entire tournament.</span>
-          )}
         </div>
       )}
 
@@ -680,7 +676,7 @@ function QuadrantBracket({ quadrant, side, podRankings, getDifficultyClass, onTe
 /* A single bracket game: two team slots with optional connector */
 function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location, predictionMode, predictionMethod, getActualResult, isCenter }) {
   const locText = location || game?.location;
-  const showPredScores = predictionMethod === 'score' || predictionMethod === 'mayhem';
+  const showPredScores = predictionMethod === 'score';
 
   // Check for actual result
   const actual = (game?.top && game?.bottom && getActualResult)
@@ -699,7 +695,7 @@ function BracketGame({ game, side, onTeamClick, isEmpty, showLocation, location,
     }
   }
 
-  // Show actual scores when game is played, or predicted scores in score/mayhem mode
+  // Show actual scores when game is played, or predicted scores in score mode
   let topScore = null, bottomScore = null;
   if (actual && game?.top && game?.bottom) {
     topScore = actual.homeTeamId === game.top.teamId ? actual.homeScore : actual.awayScore;
