@@ -23,7 +23,7 @@
     "refresh:2024": "npm run scrape:2024 && npm run import:2024 && npm run conferences:2024 && npm run analytics:2024"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=22"
   },
   "keywords": [],
   "author": "",
