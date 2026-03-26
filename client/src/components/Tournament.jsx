@@ -93,6 +93,22 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
       return actual.winnerId === teamA.teamId ? teamA : teamB;
     };
 
+    // When a game result is missing, find which team from a set of candidates
+    // played in a later round by checking all actual results for a match
+    // between one candidate from each group
+    const findActualBetweenGroups = (groupA, groupB) => {
+      for (const a of groupA) {
+        for (const b of groupB) {
+          if (!a || !b) continue;
+          const key = [a.teamId, b.teamId].sort().join('-');
+          if (actualResultsMap[key]) {
+            return { top: a, bottom: b };
+          }
+        }
+      }
+      return null;
+    };
+
     const buildQuadrant = (quadrant) => {
       const firstRound = [];
       const secondRound = [];
@@ -117,8 +133,20 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
           });
         } else {
           // No predictions — use actual results to advance teams
-          const g1W = advanceByActuals(pod.teams[0], pod.teams[3]);
-          const g2W = advanceByActuals(pod.teams[1], pod.teams[2]);
+          let g1W = advanceByActuals(pod.teams[0], pod.teams[3]);
+          let g2W = advanceByActuals(pod.teams[1], pod.teams[2]);
+          // If a first round result is missing, infer the winner from a later
+          // actual result: check if any pairing of game1 candidate vs game2
+          // candidate has been played (that's the second round game)
+          if (!g1W || !g2W) {
+            const g1Candidates = [pod.teams[0], pod.teams[3]];
+            const g2Candidates = [pod.teams[1], pod.teams[2]];
+            const inferred = findActualBetweenGroups(g1Candidates, g2Candidates);
+            if (inferred) {
+              if (!g1W) g1W = inferred.top;
+              if (!g2W) g2W = inferred.bottom;
+            }
+          }
           secondRound.push({ top: g1W || null, bottom: g2W || null, location: `${pod.hostCity}, ${pod.hostState}` });
         }
       });
@@ -140,20 +168,49 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
         // No predictions — advance using actuals through later rounds
         const s16Teams = [];
         for (let i = 0; i < secondRound.length; i += 2) {
-          const a = secondRound[i].top && secondRound[i].bottom
+          let a = secondRound[i].top && secondRound[i].bottom
             ? advanceByActuals(secondRound[i].top, secondRound[i].bottom) : null;
-          const b = secondRound[i + 1]?.top && secondRound[i + 1]?.bottom
+          let b = secondRound[i + 1]?.top && secondRound[i + 1]?.bottom
             ? advanceByActuals(secondRound[i + 1].top, secondRound[i + 1].bottom) : null;
+          // If second round results missing, infer Sweet 16 participants from
+          // actual Sweet 16 games between candidates from each pod
+          if (!a || !b) {
+            const aCandidates = secondRound[i].top && secondRound[i].bottom
+              ? [secondRound[i].top, secondRound[i].bottom]
+              : [secondRound[i].top, secondRound[i].bottom].filter(Boolean);
+            const bCandidates = secondRound[i + 1]?.top && secondRound[i + 1]?.bottom
+              ? [secondRound[i + 1].top, secondRound[i + 1].bottom]
+              : [secondRound[i + 1]?.top, secondRound[i + 1]?.bottom].filter(Boolean);
+            if (aCandidates.length && bCandidates.length) {
+              const inferred = findActualBetweenGroups(aCandidates, bCandidates);
+              if (inferred) {
+                if (!a) a = inferred.top;
+                if (!b) b = inferred.bottom;
+              }
+            }
+          }
           s16Teams.push({ top: a, bottom: b, location: finalSiteLoc });
         }
         sweet16 = s16Teams.length > 0 ? s16Teams : [
           { top: null, bottom: null, location: finalSiteLoc },
           { top: null, bottom: null, location: finalSiteLoc },
         ];
-        const qfA = sweet16[0]?.top && sweet16[0]?.bottom
+        // Same inference for quarterfinals
+        let qfA = sweet16[0]?.top && sweet16[0]?.bottom
           ? advanceByActuals(sweet16[0].top, sweet16[0].bottom) : null;
-        const qfB = sweet16[1]?.top && sweet16[1]?.bottom
+        let qfB = sweet16[1]?.top && sweet16[1]?.bottom
           ? advanceByActuals(sweet16[1].top, sweet16[1].bottom) : null;
+        if (!qfA || !qfB) {
+          const qfACandidates = [sweet16[0]?.top, sweet16[0]?.bottom].filter(Boolean);
+          const qfBCandidates = [sweet16[1]?.top, sweet16[1]?.bottom].filter(Boolean);
+          if (qfACandidates.length && qfBCandidates.length) {
+            const inferred = findActualBetweenGroups(qfACandidates, qfBCandidates);
+            if (inferred) {
+              if (!qfA) qfA = inferred.top;
+              if (!qfB) qfB = inferred.bottom;
+            }
+          }
+        }
         quarterFinal = [{ top: qfA, bottom: qfB, location: finalSiteLoc }];
       }
 
@@ -180,24 +237,60 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
         winner: preds.championship.winner,
       };
     } else {
-      // No predictions — advance using actuals
+      // No predictions — advance using actuals, with inference for missing results
       const qNames = data.quadrants.map(q => q.name);
-      const s1A = quadrants[qNames[0]]?.quarterFinal?.[0]?.top && quadrants[qNames[0]]?.quarterFinal?.[0]?.bottom
-        ? advanceByActuals(quadrants[qNames[0]].quarterFinal[0].top, quadrants[qNames[0]].quarterFinal[0].bottom) : null;
-      const s1B = quadrants[qNames[1]]?.quarterFinal?.[0]?.top && quadrants[qNames[1]]?.quarterFinal?.[0]?.bottom
-        ? advanceByActuals(quadrants[qNames[1]].quarterFinal[0].top, quadrants[qNames[1]].quarterFinal[0].bottom) : null;
-      const s2A = quadrants[qNames[2]]?.quarterFinal?.[0]?.top && quadrants[qNames[2]]?.quarterFinal?.[0]?.bottom
-        ? advanceByActuals(quadrants[qNames[2]].quarterFinal[0].top, quadrants[qNames[2]].quarterFinal[0].bottom) : null;
-      const s2B = quadrants[qNames[3]]?.quarterFinal?.[0]?.top && quadrants[qNames[3]]?.quarterFinal?.[0]?.bottom
-        ? advanceByActuals(quadrants[qNames[3]].quarterFinal[0].top, quadrants[qNames[3]].quarterFinal[0].bottom) : null;
+      const getQfWinner = (qName) => {
+        const qf = quadrants[qName]?.quarterFinal?.[0];
+        if (qf?.top && qf?.bottom) return advanceByActuals(qf.top, qf.bottom);
+        return null;
+      };
+      let s1A = getQfWinner(qNames[0]);
+      let s1B = getQfWinner(qNames[1]);
+      let s2A = getQfWinner(qNames[2]);
+      let s2B = getQfWinner(qNames[3]);
+      // Infer semifinalists from actual results if QF results are missing
+      if (!s1A || !s1B) {
+        const aCandidates = [quadrants[qNames[0]]?.quarterFinal?.[0]?.top, quadrants[qNames[0]]?.quarterFinal?.[0]?.bottom].filter(Boolean);
+        const bCandidates = [quadrants[qNames[1]]?.quarterFinal?.[0]?.top, quadrants[qNames[1]]?.quarterFinal?.[0]?.bottom].filter(Boolean);
+        if (aCandidates.length && bCandidates.length) {
+          const inferred = findActualBetweenGroups(aCandidates, bCandidates);
+          if (inferred) {
+            if (!s1A) s1A = inferred.top;
+            if (!s1B) s1B = inferred.bottom;
+          }
+        }
+      }
+      if (!s2A || !s2B) {
+        const aCandidates = [quadrants[qNames[2]]?.quarterFinal?.[0]?.top, quadrants[qNames[2]]?.quarterFinal?.[0]?.bottom].filter(Boolean);
+        const bCandidates = [quadrants[qNames[3]]?.quarterFinal?.[0]?.top, quadrants[qNames[3]]?.quarterFinal?.[0]?.bottom].filter(Boolean);
+        if (aCandidates.length && bCandidates.length) {
+          const inferred = findActualBetweenGroups(aCandidates, bCandidates);
+          if (inferred) {
+            if (!s2A) s2A = inferred.top;
+            if (!s2B) s2B = inferred.bottom;
+          }
+        }
+      }
       semiFinals = [
         { top: s1A || null, bottom: s1B || null, label: 'Naismith vs Cramer' },
         { top: s2A || null, bottom: s2B || null, label: 'Duer vs Liston' },
       ];
-      const champA = semiFinals[0].top && semiFinals[0].bottom
+      let champA = semiFinals[0].top && semiFinals[0].bottom
         ? advanceByActuals(semiFinals[0].top, semiFinals[0].bottom) : null;
-      const champB = semiFinals[1].top && semiFinals[1].bottom
+      let champB = semiFinals[1].top && semiFinals[1].bottom
         ? advanceByActuals(semiFinals[1].top, semiFinals[1].bottom) : null;
+      // Infer championship participants from actual results
+      if (!champA || !champB) {
+        const champACandidates = [semiFinals[0].top, semiFinals[0].bottom].filter(Boolean);
+        const champBCandidates = [semiFinals[1].top, semiFinals[1].bottom].filter(Boolean);
+        if (champACandidates.length && champBCandidates.length) {
+          const inferred = findActualBetweenGroups(champACandidates, champBCandidates);
+          if (inferred) {
+            if (!champA) champA = inferred.top;
+            if (!champB) champB = inferred.bottom;
+          }
+        }
+      }
       const champWinner = champA && champB ? advanceByActuals(champA, champB) : null;
       championship = { top: champA || null, bottom: champB || null, winner: champWinner || null };
     }
