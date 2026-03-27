@@ -22,8 +22,11 @@ async function calculateDynamicStats(pool, filters) {
     season = DEFAULT_SEASON,
   } = filters;
 
-  // Build the WHERE clause for game filtering
-  const gameFilters = ['g.is_naia_game = true', 'g.is_completed = true', `g.season = '${season.replace(/'/g, "''")}'`];
+  // Build the WHERE clause for game filtering using parameterized queries
+  const params = [league, season];
+  let paramIndex = 3;
+
+  const gameFilters = ['g.is_naia_game = true', 'g.is_completed = true', `g.season = $2`];
   if (gameType === 'conference') {
     gameFilters.push('g.is_conference = true');
   }
@@ -43,8 +46,12 @@ async function calculateDynamicStats(pool, filters) {
   // Handle month filter (format: YYYY-MM)
   if (seasonSegment && seasonSegment.match(/^\d{4}-\d{2}$/)) {
     const [year, month] = seasonSegment.split('-');
-    gameFilters.push(`EXTRACT(YEAR FROM g.game_date) = ${parseInt(year)}`);
-    gameFilters.push(`EXTRACT(MONTH FROM g.game_date) = ${parseInt(month)}`);
+    gameFilters.push(`EXTRACT(YEAR FROM g.game_date) = $${paramIndex}`);
+    params.push(parseInt(year));
+    paramIndex++;
+    gameFilters.push(`EXTRACT(MONTH FROM g.game_date) = $${paramIndex}`);
+    params.push(parseInt(month));
+    paramIndex++;
   }
 
   const gameWhereClause = gameFilters.join(' AND ');
@@ -54,9 +61,6 @@ async function calculateDynamicStats(pool, filters) {
                    : seasonSegment === 'last5' ? 5
                    : seasonSegment === 'last3' ? 3
                    : null;
-
-  const params = [league];
-  let paramIndex = 2;
 
   // Build conference filter for final WHERE
   let conferenceClause = '';
@@ -344,7 +348,7 @@ async function calculateDynamicStats(pool, filters) {
       AND tr.season = t.season
       AND tr.date_calculated = (SELECT MAX(date_calculated) FROM team_ratings WHERE season = t.season)
     WHERE t.league = $1
-    AND t.season = '${season.replace(/'/g, "''")}'
+    AND t.season = $2
     AND t.is_excluded = FALSE
     ${conferenceClause}
     ORDER BY adjusted_net_rating DESC NULLS LAST

@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const morgan = require('morgan');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { clerkMiddleware } = require('@clerk/express');
 const { startScheduler } = require('./scheduler');
 
 // Route modules
@@ -17,6 +20,18 @@ const tournamentRoutes = require('./routes/tournament');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Security headers
+app.use(helmet());
+
+// Rate limiting — 100 requests per minute per IP
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
+
 // Middleware
 if (process.env.NODE_ENV === 'production') {
   app.use(cors({
@@ -26,6 +41,9 @@ if (process.env.NODE_ENV === 'production') {
   app.use(cors());
 }
 app.use(express.json());
+
+// Clerk authentication middleware — populates req.auth on all requests
+app.use(clerkMiddleware());
 
 // Request logging — concise in production, detailed in dev
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

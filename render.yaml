@@ -16,6 +16,10 @@ services:
         value: "22.22.0"
       - key: SEASON
         value: "2025-26"
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
 
   # Frontend Static Site
   - type: web
@@ -26,4 +30,6 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://naia-analytics-api.onrender.com
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
 

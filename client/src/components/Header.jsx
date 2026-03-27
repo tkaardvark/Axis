@@ -2,6 +2,7 @@ import './Header.css';
 import logoSrc from '../assets/logo.svg';
 import logoDarkSrc from '../assets/logo-dark.svg';
 import { useTheme } from '../contexts/ThemeContext.jsx';
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react';
 
 function Header({ league, onLeagueChange, activePage, onPageChange, season, seasons, onSeasonChange, lastUpdated, hasPlayers }) {
   const { theme, toggleTheme } = useTheme();
@@ -40,6 +41,14 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
         </div>
 
         <div className="header-right">
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="sign-in-button">Sign In</button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
           <button
             className="theme-toggle"
             onClick={toggleTheme}
