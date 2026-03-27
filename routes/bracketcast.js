@@ -40,10 +40,12 @@ router.get('/api/bracketcast', async (req, res) => {
     const { league = 'mens', season = DEFAULT_SEASON, asOfDate: userAsOfDate, source } = req.query;
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
 
-    // If user provides an asOfDate, use it; otherwise get the latest game date
+    // If user provides an asOfDate, validate and use it; otherwise get the latest game date
     let asOfDate;
     if (userAsOfDate) {
-      // User-provided date - use end of that day (games on that date are included)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(userAsOfDate)) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+      }
       asOfDate = userAsOfDate;
     } else if (useBoxScore) {
       const asOfResult = await pool.query(`

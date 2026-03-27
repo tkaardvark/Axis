@@ -46,18 +46,20 @@ async function calculateDynamicStatsFromBoxScores(pool, filters) {
   }
   // Note: conftournament and nationaltournament are not distinguishable in exp_ tables yet
 
-  // Month filter
+  // Month filter — parameterized to prevent injection
+  const params = [season, league];
+  let paramIndex = 3;
   if (seasonSegment && seasonSegment.match(/^\d{4}-\d{2}$/)) {
     const [year, month] = seasonSegment.split('-');
-    expFilters.push(`EXTRACT(YEAR FROM e.game_date) = ${parseInt(year)}`);
-    expFilters.push(`EXTRACT(MONTH FROM e.game_date) = ${parseInt(month)}`);
+    expFilters.push(`EXTRACT(YEAR FROM e.game_date) = $${paramIndex}`);
+    params.push(parseInt(year));
+    paramIndex++;
+    expFilters.push(`EXTRACT(MONTH FROM e.game_date) = $${paramIndex}`);
+    params.push(parseInt(month));
+    paramIndex++;
   }
 
   const expWhereClause = expFilters.join(' AND ');
-
-  // Build conference filter
-  const params = [season, league];
-  let paramIndex = 3;
   let conferenceClause = '';
   if (conference && conference !== 'All Conferences') {
     conferenceClause = `AND t.conference = $${paramIndex}`;
@@ -707,13 +709,13 @@ async function getBoxScorePlayerStats(pool, filters) {
       LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = p.season
       WHERE ${whereConditions.join(' AND ')} AND g.is_exhibition = false
       GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, pl.position, pl.year
-      HAVING COUNT(*) >= ${parseInt(min_gp) || 0}
+      HAVING COUNT(*) >= $${paramIndex}
     )
     SELECT * FROM player_seasons
     ORDER BY ${sortColumn} ${order} NULLS LAST
-    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}
   `;
-  params.push(parseInt(limit) || 100, parseInt(offset) || 0);
+  params.push(parseInt(min_gp) || 0, parseInt(limit) || 100, parseInt(offset) || 0);
 
   const result = await pool.query(query, params);
 
@@ -727,7 +729,7 @@ async function getBoxScorePlayerStats(pool, filters) {
       LEFT JOIN players pl ON pl.player_id = p.player_id AND pl.season = p.season
       WHERE ${whereConditions.join(' AND ')} AND g.is_exhibition = false
       GROUP BY p.player_name, p.player_id, p.team_name, t.team_id, t.conference, t.logo_url, t.primary_color, pl.first_name, pl.last_name, pl.position, pl.year
-      HAVING COUNT(*) >= ${parseInt(min_gp) || 0}
+      HAVING COUNT(*) >= $${paramIndex}
     ) sub
   `;
   const countResult = await pool.query(countQuery, params.slice(0, -2));

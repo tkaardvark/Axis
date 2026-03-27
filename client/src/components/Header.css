@@ -34,18 +34,18 @@
 }
 
 .sign-in-button {
-  background: var(--accent);
-  color: #fff;
+  background: var(--color-accent-primary);
+  color: var(--color-text-inverted);
   border: none;
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: background 0.15s;
 }
 .sign-in-button:hover {
-  opacity: 0.85;
+  background: var(--color-accent-primary-hover);
 }
 
 .logo {

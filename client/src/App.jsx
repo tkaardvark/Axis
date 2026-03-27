@@ -54,8 +54,12 @@ function App() {
   }, []);
 
   // Extract params from URL with defaults
-  const league = searchParams.get('league') || DEFAULTS.league;
-  const season = searchParams.get('season') || DEFAULTS.season;
+  // Extract params from URL with defaults — validate league against whitelist
+  const VALID_LEAGUES = new Set(['mens', 'womens']);
+  const rawLeague = searchParams.get('league');
+  const league = (rawLeague && VALID_LEAGUES.has(rawLeague)) ? rawLeague : DEFAULTS.league;
+  const rawSeason = searchParams.get('season');
+  const season = (rawSeason && /^\d{4}-\d{2}$/.test(rawSeason)) ? rawSeason : DEFAULTS.season;
   const conference = searchParams.get('conference') || DEFAULTS.conference;
   const opponent = searchParams.get('opponent') || DEFAULTS.opponent;
   const seasonSegment = searchParams.get('seasonSegment') || DEFAULTS.seasonSegment;

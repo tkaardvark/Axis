@@ -21,6 +21,9 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const SEASON = process.env.SEASON || '2025-26';
+if (!/^\d{4}-\d{2}$/.test(SEASON)) {
+  throw new Error(`Invalid SEASON format: ${SEASON}. Expected YYYY-YY.`);
+}
 const scriptDir = __dirname;
 
 // Track running jobs to prevent overlap
