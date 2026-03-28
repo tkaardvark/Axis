@@ -5,8 +5,21 @@ const path = require('path');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { clerkMiddleware } = require('@clerk/express');
 const { startScheduler } = require('./scheduler');
+
+// Clerk auth — optional, graceful fallback if keys not configured
+let clerkMiddlewareFn;
+try {
+  if (process.env.CLERK_SECRET_KEY) {
+    const { clerkMiddleware } = require('@clerk/express');
+    clerkMiddlewareFn = clerkMiddleware();
+  }
+} catch (e) {
+  console.warn('Clerk middleware unavailable:', e.message);
+}
+if (!clerkMiddlewareFn) {
+  clerkMiddlewareFn = (req, _res, next) => { req.auth = { userId: null }; next(); };
+}
 
 // Route modules
 const metadataRoutes = require('./routes/metadata');
@@ -43,7 +56,7 @@ if (process.env.NODE_ENV === 'production') {
 app.use(express.json());
 
 // Clerk authentication middleware — populates req.auth on all requests
-app.use(clerkMiddleware());
+app.use(clerkMiddlewareFn);
 
 // Request logging — concise in production, detailed in dev
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

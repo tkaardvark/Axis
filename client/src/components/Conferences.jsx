@@ -485,7 +485,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
   };
 
   const handleTeamClick = (team) => {
-    navigate(`/scout?team=${team.team_id}&league=${league}&season=${season}`);
+    navigate(`/app/scout?team=${team.team_id}&league=${league}&season=${season}`);
   };
 
   const ProfileTooltip = ({ active, payload, label }) => {

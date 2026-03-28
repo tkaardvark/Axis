@@ -132,7 +132,7 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick,
     params.set('conference', conferenceName);
     params.delete('conferenceModal');
     onClose();
-    navigate(`/conferences?${params.toString()}`);
+    navigate(`/app/conferences?${params.toString()}`);
   };
 
   const handlePrevDay = () => {

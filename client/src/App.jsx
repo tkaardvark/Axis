@@ -14,6 +14,7 @@ import { API_URL } from './utils/api';
 import './App.css';
 
 // Lazy-load secondary page components for code splitting
+const Landing = lazy(() => import('./components/Landing'));
 const Insights = lazy(() => import('./components/Insights'));
 const Scout = lazy(() => import('./components/Scout'));
 const Players = lazy(() => import('./components/Players'));
@@ -127,12 +128,12 @@ function App() {
   // Determine current page from pathname
   const getCurrentPage = () => {
     const path = location.pathname;
-    if (path.startsWith('/conferences')) return 'conferences';
-    if (path.startsWith('/bracketcast')) return 'tournament';
-    if (path.startsWith('/tournament')) return 'tournament';
-    if (path.startsWith('/scout')) return 'scout';
-    if (path.startsWith('/methodology')) return 'methodology';
-    if (path.startsWith('/players')) return 'players';
+    if (path.startsWith('/app/conferences')) return 'conferences';
+    if (path.startsWith('/app/bracketcast')) return 'tournament';
+    if (path.startsWith('/app/tournament')) return 'tournament';
+    if (path.startsWith('/app/scout')) return 'scout';
+    if (path.startsWith('/app/methodology')) return 'methodology';
+    if (path.startsWith('/app/players')) return 'players';
     return 'teams';
   };
 
@@ -141,7 +142,7 @@ function App() {
   const setCurrentPage = useCallback((page) => {
     // Preserve current search params when navigating
     const params = searchParams.toString();
-    const newPath = page === 'teams' ? '/' : `/${page}`;
+    const newPath = page === 'teams' ? '/app' : `/app/${page}`;
     navigate(params ? `${newPath}?${params}` : newPath);
   }, [navigate, searchParams]);
 
@@ -348,121 +349,121 @@ function App() {
   );
 
   return (
-    <div className="app">
-      <a href="#main-content" className="skip-link">Skip to content</a>
-      <Header
-        league={league}
-        onLeagueChange={setLeague}
-        season={season}
-        onSeasonChange={setSeason}
-        seasons={seasons}
-        lastUpdated={lastUpdated}
-        activePage={currentPage}
-        onPageChange={setCurrentPage}
-        hasPlayers={hasPlayers}
-      />
-      <main id="main-content" className="main-content">
-        {error && (
-          <div className="error-banner">
-            <p>{error}</p>
-            <button onClick={fetchTeams}>Retry</button>
-          </div>
-        )}
-        <Suspense fallback={<SkeletonLoader variant="table" rows={10} />}>
-          <Routes>
-            <Route path="/" element={<TeamsPage />} />
-            <Route path="/teams" element={<Navigate to="/" replace />} />
-            <Route path="/insights" element={<Navigate to="/?view=charts" replace />} />
-            <Route
-              path="/conferences"
-              element={
-                <RequireAuth>
-                  <Conferences
-                    league={league}
-                    season={season}
-                    conferences={conferences}
-                    teams={teams}
-                    sourceParam={sourceParam}
-                  />
-                </RequireAuth>
-              }
+    <Suspense fallback={<SkeletonLoader variant="table" rows={10} />}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/app/*" element={
+          <div className="app">
+            <a href="#main-content" className="skip-link">Skip to content</a>
+            <Header
+              league={league}
+              onLeagueChange={setLeague}
+              season={season}
+              onSeasonChange={setSeason}
+              seasons={seasons}
+              lastUpdated={lastUpdated}
+              activePage={currentPage}
+              onPageChange={setCurrentPage}
+              hasPlayers={hasPlayers}
             />
-            <Route path="/bracketcast" element={<Navigate to="/tournament" replace />} />
-            <Route
-              path="/scout"
-              element={
-                <RequireAuth>
-                  <Scout
-                    league={league}
-                    season={season}
-                    teams={teams}
-                    conferences={conferences}
-                    sourceParam={sourceParam}
-                  />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/players"
-              element={
-                <RequireAuth>
-                  <Players
-                    league={league}
-                    season={season}
-                    conferences={conferences}
-                    sourceParam={sourceParam}
-                  />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/tournament"
-              element={
-                <RequireAuth>
-                  <Tournament
-                    league={league}
-                    season={season}
-                    onTeamClick={handleTeamClick}
-                    sourceParam={sourceParam}
-                  />
-                </RequireAuth>
-              }
-            />
-            <Route path="/methodology" element={<Methodology />} />
-            <Route
-              path="*"
-              element={
-                <div className="not-found">
-                  <h1>404</h1>
-                  <p>Page not found</p>
-                  <button onClick={() => navigate('/')}>Go to Teams</button>
+            <main id="main-content" className="main-content">
+              {error && (
+                <div className="error-banner">
+                  <p>{error}</p>
+                  <button onClick={fetchTeams}>Retry</button>
                 </div>
-              }
-            />
-          </Routes>
-        </Suspense>
-      </main>
-      <Footer />
-      {selectedTeam && (
-        <TeamModal
-          team={selectedTeam}
-          onClose={handleCloseModal}
-          league={league}
-          season={season}
-          sourceParam={sourceParam}
-        />
-      )}
-      {selectedConference && (
-        <ConferenceModal
-          conferenceName={selectedConference}
-          league={league}
-          season={season}
-          onClose={handleCloseConferenceModal}
-          onTeamClick={handleTeamClick}
-          sourceParam={sourceParam}
-        />
-      )}
-    </div>
+              )}
+              <Suspense fallback={<SkeletonLoader variant="table" rows={10} />}>
+                <Routes>
+                  <Route path="/" element={<TeamsPage />} />
+                  <Route path="/teams" element={<Navigate to="/app" replace />} />
+                  <Route path="/insights" element={<Navigate to="/app?view=charts" replace />} />
+                  <Route path="/conferences" element={
+                    <RequireAuth>
+                      <Conferences
+                        league={league}
+                        season={season}
+                        conferences={conferences}
+                        teams={teams}
+                        sourceParam={sourceParam}
+                      />
+                    </RequireAuth>
+                  } />
+                  <Route path="/bracketcast" element={<Navigate to="/app/tournament" replace />} />
+                  <Route path="/scout" element={
+                    <RequireAuth>
+                      <Scout
+                        league={league}
+                        season={season}
+                        teams={teams}
+                        conferences={conferences}
+                        sourceParam={sourceParam}
+                      />
+                    </RequireAuth>
+                  } />
+                  <Route path="/players" element={
+                    <RequireAuth>
+                      <Players
+                        league={league}
+                        season={season}
+                        conferences={conferences}
+                        sourceParam={sourceParam}
+                      />
+                    </RequireAuth>
+                  } />
+                  <Route path="/tournament" element={
+                    <RequireAuth>
+                      <Tournament
+                        league={league}
+                        season={season}
+                        onTeamClick={handleTeamClick}
+                        sourceParam={sourceParam}
+                      />
+                    </RequireAuth>
+                  } />
+                  <Route path="/methodology" element={<Methodology />} />
+                  <Route path="*" element={
+                    <div className="not-found">
+                      <h1>404</h1>
+                      <p>Page not found</p>
+                      <button onClick={() => navigate('/app')}>Go to Teams</button>
+                    </div>
+                  } />
+                </Routes>
+              </Suspense>
+            </main>
+            <Footer />
+            {selectedTeam && (
+              <TeamModal
+                team={selectedTeam}
+                onClose={handleCloseModal}
+                league={league}
+                season={season}
+                sourceParam={sourceParam}
+              />
+            )}
+            {selectedConference && (
+              <ConferenceModal
+                conferenceName={selectedConference}
+                league={league}
+                season={season}
+                onClose={handleCloseConferenceModal}
+                onTeamClick={handleTeamClick}
+                sourceParam={sourceParam}
+              />
+            )}
+          </div>
+        } />
+        {/* Redirect old root-level routes to /app */}
+        <Route path="/teams" element={<Navigate to="/app" replace />} />
+        <Route path="/conferences" element={<Navigate to="/app/conferences" replace />} />
+        <Route path="/players" element={<Navigate to="/app/players" replace />} />
+        <Route path="/tournament" element={<Navigate to="/app/tournament" replace />} />
+        <Route path="/scout" element={<Navigate to="/app/scout" replace />} />
+        <Route path="/methodology" element={<Navigate to="/app/methodology" replace />} />
+        <Route path="/bracketcast" element={<Navigate to="/app/tournament" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

@@ -7,7 +7,7 @@ function Footer() {
 
   const handleAboutClick = () => {
     const params = searchParams.toString();
-    navigate(params ? `/methodology?${params}` : '/methodology');
+    navigate(params ? `/app/methodology?${params}` : '/app/methodology');
   };
 
   return (

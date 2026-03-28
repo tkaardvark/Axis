@@ -95,7 +95,7 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
     params.set('team', team.team_id);
     params.delete('teamModal');
     onClose();
-    navigate(`/scout?${params.toString()}`);
+    navigate(`/app/scout?${params.toString()}`);
   };
 
   useEffect(() => {
