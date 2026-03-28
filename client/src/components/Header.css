@@ -48,6 +48,18 @@
   background: var(--color-accent-primary-hover);
 }
 
+/* Clerk UserButton — match theme-toggle size and brand color */
+.cl-avatar-box {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.cl-userButtonTrigger {
+  outline: 2px solid var(--color-accent-primary) !important;
+  outline-offset: 1px;
+  border-radius: 50% !important;
+}
+
 .logo {
   display: flex;
   align-items: center;

@@ -4,9 +4,10 @@ const { pool, DEFAULT_SEASON } = require('../db/pool');
 const { calculateDynamicStats } = require('../utils/legacy/dynamicStats');
 const { calculateDynamicStatsFromBoxScores } = require('../utils/dynamicStatsBoxScore');
 const { resolveSource } = require('../utils/dataSource');
+const { requireSignIn } = require('../utils/authMiddleware');
 
 // Get matchup comparison data for two teams
-router.get('/api/matchup', async (req, res) => {
+router.get('/api/matchup', requireSignIn, async (req, res) => {
   try {
     const { team1, team2, season = DEFAULT_SEASON, league = 'mens', source } = req.query;
 
@@ -220,7 +221,7 @@ router.get('/api/matchup', async (req, res) => {
 });
 
 // Get box score for a specific game
-router.get('/api/games/:gameId/boxscore', async (req, res) => {
+router.get('/api/games/:gameId/boxscore', requireSignIn, async (req, res) => {
   try {
     const { gameId } = req.params;
     const { season = DEFAULT_SEASON, source, league } = req.query;

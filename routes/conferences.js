@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
 const { resolveSource } = require('../utils/dataSource');
+const { requireSignIn } = require('../utils/authMiddleware');
 
 // Get conference games for a specific date
-router.get('/api/conferences/:conference/games', async (req, res) => {
+router.get('/api/conferences/:conference/games', requireSignIn, async (req, res) => {
   try {
     const { conference } = req.params;
     const { league = 'mens', season = DEFAULT_SEASON, date, startDate, endDate, completed, source } = req.query;
@@ -254,7 +255,7 @@ router.get('/api/conferences/:conference/games', async (req, res) => {
 });
 
 // Get conference summary/aggregate stats
-router.get('/api/conferences/:conference/summary', async (req, res) => {
+router.get('/api/conferences/:conference/summary', requireSignIn, async (req, res) => {
   try {
     const { conference } = req.params;
     const { league = 'mens', season = DEFAULT_SEASON, source } = req.query;
@@ -378,7 +379,7 @@ router.get('/api/conferences/:conference/summary', async (req, res) => {
 });
 
 // Get head-to-head matrix for a conference
-router.get('/api/conferences/:conference/head-to-head', async (req, res) => {
+router.get('/api/conferences/:conference/head-to-head', requireSignIn, async (req, res) => {
   try {
     const { conference } = req.params;
     const { league = 'mens', season = DEFAULT_SEASON, source } = req.query;
@@ -482,7 +483,7 @@ router.get('/api/conferences/:conference/head-to-head', async (req, res) => {
 });
 
 // Get all conference rankings for strength comparison
-router.get('/api/conference-rankings', async (req, res) => {
+router.get('/api/conference-rankings', requireSignIn, async (req, res) => {
   try {
     const { league = 'mens', season = DEFAULT_SEASON, source } = req.query;
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
@@ -741,7 +742,7 @@ router.get('/api/conference-rankings', async (req, res) => {
 });
 
 // Get all teams with Adj NET rank grouped by conference (for conference scatter chart)
-router.get('/api/conference-rpi-scatter', async (req, res) => {
+router.get('/api/conference-rpi-scatter', requireSignIn, async (req, res) => {
   try {
     const { league = 'mens', season = DEFAULT_SEASON } = req.query;
 

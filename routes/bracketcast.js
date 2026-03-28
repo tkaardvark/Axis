@@ -4,6 +4,7 @@ const { pool, DEFAULT_SEASON } = require('../db/pool');
 const { getConferenceChampions } = require('../utils/conferenceChampions');
 const { getQuadrant } = require('../utils/quadrant');
 const { resolveSource } = require('../utils/dataSource');
+const { requireSignIn } = require('../utils/authMiddleware');
 
 // Conference to Area mapping based on NAIA Selection Committee Policy
 const CONFERENCE_AREAS = {
@@ -35,7 +36,7 @@ const CONFERENCE_AREAS = {
 };
 
 // Get bracketcast data with quadrant records and seed projections
-router.get('/api/bracketcast', async (req, res) => {
+router.get('/api/bracketcast', requireSignIn, async (req, res) => {
   try {
     const { league = 'mens', season = DEFAULT_SEASON, asOfDate: userAsOfDate, source } = req.query;
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';

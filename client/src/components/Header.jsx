@@ -47,7 +47,14 @@ function Header({ league, onLeagueChange, activePage, onPageChange, season, seas
             </SignInButton>
           </SignedOut>
           <SignedIn>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: 'cl-avatar-box',
+                },
+              }}
+            />
           </SignedIn>
           <button
             className="theme-toggle"

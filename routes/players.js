@@ -3,9 +3,10 @@ const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
 const { getBoxScorePlayerStats, getClutchPlayerStats } = require('../utils/dynamicStatsBoxScore');
 const { resolveSource } = require('../utils/dataSource');
+const { requireSignIn } = require('../utils/authMiddleware');
 
 // Get all players (with filtering and sorting)
-router.get('/api/players', async (req, res) => {
+router.get('/api/players', requireSignIn, async (req, res) => {
   try {
     const {
       league = 'mens',
@@ -161,7 +162,7 @@ router.get('/api/players', async (req, res) => {
 });
 
 // Get single player by ID
-router.get('/api/players/:playerId', async (req, res) => {
+router.get('/api/players/:playerId', requireSignIn, async (req, res) => {
   try {
     const { playerId } = req.params;
     const { season = DEFAULT_SEASON } = req.query;

@@ -8,6 +8,7 @@ import TeamsTable from './components/TeamsTable';
 import TeamModal from './components/TeamModal';
 import ConferenceModal from './components/ConferenceModal';
 import SkeletonLoader from './components/SkeletonLoader';
+import RequireAuth from './components/RequireAuth';
 import Footer from './components/Footer';
 import { API_URL } from './utils/api';
 import './App.css';
@@ -375,48 +376,56 @@ function App() {
             <Route
               path="/conferences"
               element={
-                <Conferences
-                  league={league}
-                  season={season}
-                  conferences={conferences}
-                  teams={teams}
-                  sourceParam={sourceParam}
-                />
+                <RequireAuth>
+                  <Conferences
+                    league={league}
+                    season={season}
+                    conferences={conferences}
+                    teams={teams}
+                    sourceParam={sourceParam}
+                  />
+                </RequireAuth>
               }
             />
             <Route path="/bracketcast" element={<Navigate to="/tournament" replace />} />
             <Route
               path="/scout"
               element={
-                <Scout
-                  league={league}
-                  season={season}
-                  teams={teams}
-                  conferences={conferences}
-                  sourceParam={sourceParam}
-                />
+                <RequireAuth>
+                  <Scout
+                    league={league}
+                    season={season}
+                    teams={teams}
+                    conferences={conferences}
+                    sourceParam={sourceParam}
+                  />
+                </RequireAuth>
               }
             />
             <Route
               path="/players"
               element={
-                <Players
-                  league={league}
-                  season={season}
-                  conferences={conferences}
-                  sourceParam={sourceParam}
-                />
+                <RequireAuth>
+                  <Players
+                    league={league}
+                    season={season}
+                    conferences={conferences}
+                    sourceParam={sourceParam}
+                  />
+                </RequireAuth>
               }
             />
             <Route
               path="/tournament"
               element={
-                <Tournament
-                  league={league}
-                  season={season}
-                  onTeamClick={handleTeamClick}
-                  sourceParam={sourceParam}
-                />
+                <RequireAuth>
+                  <Tournament
+                    league={league}
+                    season={season}
+                    onTeamClick={handleTeamClick}
+                    sourceParam={sourceParam}
+                  />
+                </RequireAuth>
               }
             />
             <Route path="/methodology" element={<Methodology />} />

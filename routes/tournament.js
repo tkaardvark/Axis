@@ -4,6 +4,7 @@ const { pool, DEFAULT_SEASON } = require('../db/pool');
 const { TOURNAMENT_BRACKET_2026 } = require('../config/tournament-bracket-2026');
 const { resolveSource } = require('../utils/dataSource');
 const { getQuadrant } = require('../utils/quadrant');
+const { requireSignIn } = require('../utils/authMiddleware');
 
 // Conference to Area mapping (same as bracketcast)
 const CONFERENCE_AREAS = {
@@ -40,7 +41,7 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-router.get('/api/tournament', async (req, res) => {
+router.get('/api/tournament', requireSignIn, async (req, res) => {
   try {
     const { league = 'mens', season = DEFAULT_SEASON, source } = req.query;
     const bracket = TOURNAMENT_BRACKET_2026;
