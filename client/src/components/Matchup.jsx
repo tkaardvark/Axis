@@ -16,6 +16,7 @@ import MatchupComparisonBar from './MatchupComparisonBar';
 
 import { API_URL } from '../utils/api';
 import { formatDate } from '../utils/formatters';
+import { getPercentile } from '../utils/percentile';
 import SkeletonLoader from './SkeletonLoader';
 
 const RADAR_METRICS = [
@@ -26,14 +27,6 @@ const RADAR_METRICS = [
   { key: 'pace', label: 'Pace', higherIsBetter: null },
   { key: 'three_pt_rate', label: '3PT Rate', higherIsBetter: null },
 ];
-
-function getPercentile(value, allValues, higherIsBetter = true) {
-  if (value === null || value === undefined) return 50;
-  const sorted = [...allValues].filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
-  const rank = sorted.findIndex(v => v >= value);
-  const percentile = (rank / sorted.length) * 100;
-  return higherIsBetter ? percentile : 100 - percentile;
-}
 
 function Matchup({ league, season, teams = [], conferences = [], sourceParam = '' }) {
   const [searchParams, setSearchParams] = useSearchParams();

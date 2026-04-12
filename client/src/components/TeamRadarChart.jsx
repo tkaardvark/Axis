@@ -9,6 +9,7 @@ import {
   Legend,
   Tooltip,
 } from 'recharts';
+import { getPercentile } from '../utils/percentile';
 
 // Metrics configuration - what we show on the radar
 // For defense metrics, "lower is better" so we invert the percentile
@@ -20,15 +21,6 @@ const RADAR_METRICS = [
   { key: 'pace', label: 'Pace', description: 'Possessions/Game', higherIsBetter: null }, // neutral
   { key: 'three_pt_rate', label: '3PT Rate', description: '3PT Attempt Rate', higherIsBetter: null }, // style
 ];
-
-// Calculate percentile rank (0-100) for a value within an array
-function getPercentile(value, allValues, higherIsBetter = true) {
-  if (value === null || value === undefined) return 50;
-  const sorted = [...allValues].filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
-  const rank = sorted.findIndex(v => v >= value);
-  const percentile = (rank / sorted.length) * 100;
-  return higherIsBetter ? percentile : 100 - percentile;
-}
 
 function TeamRadarChart({ team, allTeams }) {
   const chartData = useMemo(() => {

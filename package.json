@@ -13,7 +13,7 @@
     "analytics": "node calculate-analytics.js",
     "conferences": "node scrape-conferences.js",
     "setup-db": "node setup-database.js",
-    "migrate": "node migrate-add-season.js",
+    "migrate": "node migrations/010_add_season.js",
     "refresh": "npm run scrape && npm run import && npm run conferences && npm run analytics",
     "refresh:cron": "node refresh-data.js",
     "scrape:2024": "node scrape-team-urls.js --season 2024-25",

@@ -5,41 +5,8 @@ const { TOURNAMENT_BRACKET_2026 } = require('../config/tournament-bracket-2026')
 const { resolveSource } = require('../utils/dataSource');
 const { getQuadrant } = require('../utils/quadrant');
 const { requireSignIn } = require('../utils/authMiddleware');
-
-// Conference to Area mapping (same as bracketcast)
-const CONFERENCE_AREAS = {
-  'Appalachian Athletic Conference': 'East',
-  'Mid-South Conference': 'East',
-  'Southern States Athletic Conference': 'East',
-  'The Sun Conference': 'East',
-  'American Midwest Conference': 'Midwest',
-  'Great Plains Athletic Conference': 'Midwest',
-  'Heart of America Athletic Conference': 'Midwest',
-  'Kansas Collegiate Athletic Conference': 'Midwest',
-  'Chicagoland Collegiate Athletic Conference': 'North',
-  'Crossroads League': 'North',
-  'River States Conference': 'North',
-  'Wolverine-Hoosier Athletic Conference': 'North',
-  'Continental Athletic Conference': 'South',
-  'HBCU Athletic Conference': 'South',
-  'Red River Athletic Conference': 'South',
-  'Sooner Athletic Conference': 'South',
-  'California Pacific Conference': 'West',
-  'Cascade Collegiate Conference': 'West',
-  'Frontier Conference': 'West',
-  'Great Southwest Athletic Conference': 'West',
-};
-
-// Haversine distance in miles
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 3959; // Earth radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+const { CONFERENCE_AREAS } = require('../config/conference-areas');
+const { haversineDistance } = require('../utils/geometry');
 
 router.get('/api/tournament', requireSignIn, async (req, res) => {
   try {

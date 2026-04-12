@@ -5,6 +5,7 @@ const { calculateDynamicStats } = require('../utils/legacy/dynamicStats');
 const { calculateDynamicStatsFromBoxScores } = require('../utils/dynamicStatsBoxScore');
 const { resolveSource } = require('../utils/dataSource');
 const { requireSignIn } = require('../utils/authMiddleware');
+const { calculatePercentile } = require('../utils/percentile');
 
 // Get matchup comparison data for two teams
 router.get('/api/matchup', requireSignIn, async (req, res) => {
@@ -101,17 +102,6 @@ router.get('/api/matchup', requireSignIn, async (req, res) => {
       'oreb_pct_opp',
       'opp_pts_paint_per_game',
     ];
-
-    const calculatePercentile = (teamValue, allValues, higherBetter) => {
-      if (teamValue === null || teamValue === undefined) return null;
-      const validValues = allValues.filter(v => v !== null && v !== undefined && !isNaN(v));
-      if (validValues.length === 0) return null;
-      const val = parseFloat(teamValue);
-      const countBelow = higherBetter
-        ? validValues.filter(v => parseFloat(v) < val).length
-        : validValues.filter(v => parseFloat(v) > val).length;
-      return Math.round((countBelow / validValues.length) * 100);
-    };
 
     const statKeys = [...higherIsBetter, ...lowerIsBetter];
     const buildPercentiles = (targetTeam) => {
