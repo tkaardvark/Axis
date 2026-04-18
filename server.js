@@ -47,8 +47,23 @@ app.use('/api', apiLimiter);
 
 // Middleware
 if (process.env.NODE_ENV === 'production') {
+  // Comma-separated list of allowed origins. Defaults cover the custom domain
+  // (apex + www) and the legacy Render subdomain.
+  const allowedOrigins = (process.env.FRONTEND_URL ||
+    'https://axisbasketball.com,https://www.axisbasketball.com,https://naia-analytics.onrender.com'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   app.use(cors({
-    origin: process.env.FRONTEND_URL || 'https://naia-analytics.onrender.com',
+    origin: (origin, cb) => {
+      // Allow same-origin / curl / server-side requests with no Origin header
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
   }));
 } else {
   app.use(cors());
