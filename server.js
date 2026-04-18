@@ -34,7 +34,34 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Security headers
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'script-src': [
+        "'self'",
+        'https://*.clerk.accounts.dev',
+        'https://clerk.axisbasketball.com',
+        'https://challenges.cloudflare.com',
+      ],
+      'connect-src': [
+        "'self'",
+        'https://api.axisbasketball.com',
+        'https://*.clerk.accounts.dev',
+        'https://clerk.axisbasketball.com',
+      ],
+      'img-src': ["'self'", 'data:', 'https://img.clerk.com'],
+      'worker-src': ["'self'", 'blob:'],
+      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      'frame-src': [
+        "'self'",
+        'https://challenges.cloudflare.com',
+        'https://*.clerk.accounts.dev',
+      ],
+    },
+  },
+}));
 
 // Rate limiting — 100 requests per minute per IP
 const apiLimiter = rateLimit({
