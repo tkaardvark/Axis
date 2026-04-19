@@ -1,87 +1,94 @@
-import { SignInButton, useAuth } from '@clerk/clerk-react';
+import { useEffect, useRef, useState } from 'react';
+import { SignInButton, UserButton, useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext.jsx';
 import logoSrc from '../assets/logo.svg';
 import logoDarkSrc from '../assets/logo-dark.svg';
 import './Landing.css';
 
 const FEATURES = [
   {
-    icon: '📊',
+    tag: 'Ratings',
     title: 'Efficiency Ratings',
-    desc: 'Adjusted offensive and defensive ratings, net rating, pace, and effective FG% — possession-based metrics that cut through noise in the box score.',
+    desc: 'Adjusted offensive and defensive ratings, net rating, pace, and effective FG% — possession-based metrics that cut through the noise.',
+    preview: (
+      <div className="lp-fpreview-metrics">
+        <div className="lp-fpreview-metric"><span>AdjOE</span><strong>112.3</strong><em>+24.2</em></div>
+        <div className="lp-fpreview-metric"><span>AdjDE</span><strong>88.1</strong><em className="lp-fpreview-neg">−14.8</em></div>
+        <div className="lp-fpreview-metric"><span>Pace</span><strong>70.4</strong><em>avg</em></div>
+        <div className="lp-fpreview-metric"><span>eFG%</span><strong>54.1</strong><em>+3.2</em></div>
+      </div>
+    ),
   },
   {
-    icon: '🏆',
+    tag: 'Bracketcast',
     title: 'Bracket Forecasting',
-    desc: 'Seed projections, quadrant records (Q1/Q2/Q3/Q4), and live tournament brackets updated as results come in.',
+    desc: 'Seed projections, quadrant records (Q1–Q4), and live tournament brackets updated as results come in.',
+    preview: (
+      <div className="lp-fpreview-bracket">
+        <div className="lp-fpreview-match">
+          <div className="lp-fpreview-row"><span>1</span>Indiana Wesleyan<strong>84</strong></div>
+          <div className="lp-fpreview-row lp-fpreview-lose"><span>16</span>Bryan<strong>61</strong></div>
+        </div>
+        <div className="lp-fpreview-match">
+          <div className="lp-fpreview-row"><span>8</span>Georgetown (KY)<strong>72</strong></div>
+          <div className="lp-fpreview-row lp-fpreview-lose"><span>9</span>Freed-Hardeman<strong>69</strong></div>
+        </div>
+      </div>
+    ),
   },
   {
-    icon: '📈',
+    tag: 'RPI & SOS',
     title: 'RPI & Strength of Schedule',
     desc: "The NAIA's official RPI formula calculated daily, plus SOS, opponent win %, and conference-adjusted rankings.",
+    preview: (
+      <div className="lp-fpreview-rpi">
+        <div className="lp-fpreview-rpi-row"><span>Indiana Wesleyan</span><strong>.6842</strong></div>
+        <div className="lp-fpreview-rpi-row"><span>Southeastern</span><strong>.6701</strong></div>
+        <div className="lp-fpreview-rpi-row"><span>Marian</span><strong>.6598</strong></div>
+        <div className="lp-fpreview-rpi-row"><span>Concordia</span><strong>.6445</strong></div>
+      </div>
+    ),
   },
   {
-    icon: '🏀',
+    tag: 'Players',
     title: 'Player Leaderboards',
     desc: 'Per-game splits, shooting percentages, clutch stats, and filterable rankings for every NAIA player.',
+    preview: (
+      <div className="lp-fpreview-players">
+        <div className="lp-fpreview-player"><span className="lp-fpreview-rk">1</span><span>K. Johnson</span><strong>24.8</strong><em>PPG</em></div>
+        <div className="lp-fpreview-player"><span className="lp-fpreview-rk">2</span><span>D. Martinez</span><strong>22.1</strong><em>PPG</em></div>
+        <div className="lp-fpreview-player"><span className="lp-fpreview-rk">3</span><span>A. Williams</span><strong>21.7</strong><em>PPG</em></div>
+        <div className="lp-fpreview-player"><span className="lp-fpreview-rk">4</span><span>T. Carter</span><strong>20.9</strong><em>PPG</em></div>
+      </div>
+    ),
   },
   {
-    icon: '🔍',
+    tag: 'Matchup',
     title: 'Scout & Matchup',
     desc: 'Head-to-head comparisons, game-by-game logs, and statistical profiles for prepping any opponent.',
+    preview: (
+      <div className="lp-fpreview-matchup">
+        <div className="lp-fpreview-mhead">
+          <span>Indiana Wesleyan</span><span className="lp-fpreview-vs">vs</span><span>Marian</span>
+        </div>
+        <div className="lp-fpreview-mrow"><strong>112.3</strong><span>AdjOE</span><strong>108.4</strong></div>
+        <div className="lp-fpreview-mrow"><strong>88.1</strong><span>AdjDE</span><strong>90.2</strong></div>
+        <div className="lp-fpreview-mrow"><strong>70.4</strong><span>Pace</span><strong>68.9</strong></div>
+      </div>
+    ),
   },
   {
-    icon: '🗺️',
+    tag: 'Conferences',
     title: 'Conference Breakdowns',
     desc: 'Standings, RPI rankings, head-to-head matrices, and strength comparisons across all 21 NAIA conferences.',
-  },
-];
-
-const PRICING = [
-  {
-    name: 'Free',
-    price: '$0',
-    cadence: 'forever',
-    tagline: 'Explore team ratings and rankings.',
-    features: [
-      'Full team ratings & rankings',
-      'Conference standings',
-      'RPI & Net Rating leaderboards',
-      'Basic team pages',
-    ],
-    cta: 'Get Started',
-    highlighted: false,
-  },
-  {
-    name: 'Fan',
-    price: '$30',
-    cadence: '/month',
-    tagline: 'For dedicated followers of the game.',
-    features: [
-      'Everything in Free',
-      'Player stats & leaderboards',
-      'Matchup & head-to-head tool',
-      'Bracket forecasting',
-      'Box score drill-downs',
-    ],
-    cta: 'Start Fan Access',
-    highlighted: true,
-  },
-  {
-    name: 'Coach',
-    price: '$300',
-    cadence: '/year',
-    tagline: 'For programs and staff.',
-    features: [
-      'Everything in Fan',
-      'Full scout report access',
-      'Lineup & rotation analytics',
-      'Advanced splits (home/away, Q1-Q4)',
-      'Priority support',
-    ],
-    cta: 'Get Coach Access',
-    highlighted: false,
+    preview: (
+      <div className="lp-fpreview-conf">
+        <div className="lp-fpreview-conf-row"><span>1</span>Crossroads<strong>.612</strong></div>
+        <div className="lp-fpreview-conf-row"><span>2</span>Sooner<strong>.594</strong></div>
+        <div className="lp-fpreview-conf-row"><span>3</span>Heart of America<strong>.581</strong></div>
+        <div className="lp-fpreview-conf-row"><span>4</span>Mid-South<strong>.567</strong></div>
+      </div>
+    ),
   },
 ];
 
@@ -89,13 +96,147 @@ const STATS = [
   { value: '250+', label: 'Teams Tracked' },
   { value: '5,000+', label: 'Games Analyzed' },
   { value: '30+', label: 'Advanced Metrics' },
-  { value: '24/7', label: 'Data Updates' },
 ];
 
 export default function Landing() {
   const { isSignedIn } = useAuth();
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+  const heroRef = useRef(null);
+  const featuresScrollRef = useRef(null);
+  const featuresViewportRef = useRef(null);
+  const [featurePage, setFeaturePage] = useState(0);
+  const [perPage, setPerPage] = useState(3);
+  const [viewportW, setViewportW] = useState(0);
+
+  // Recompute perPage + viewport width responsively.
+  useEffect(() => {
+    const compute = () => {
+      const w = window.innerWidth;
+      if (w >= 1100) setPerPage(3);
+      else if (w >= 720) setPerPage(2);
+      else setPerPage(1);
+      if (featuresViewportRef.current) {
+        setViewportW(featuresViewportRef.current.clientWidth);
+      }
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(FEATURES.length / perPage));
+  const currentPage = featurePage % totalPages;
+
+  const scrollFeatures = (direction) => {
+    setFeaturePage((p) => {
+      const next = (p + direction + totalPages) % totalPages;
+      return next;
+    });
+  };
+
+  // Keep page in range when perPage changes (e.g., resize)
+  useEffect(() => {
+    setFeaturePage((p) => p % totalPages);
+  }, [totalPages]);
+
+  // Swipe support on the carousel viewport
+  useEffect(() => {
+    const el = featuresViewportRef.current;
+    if (!el) return;
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+    const onStart = (e) => {
+      const t = e.touches ? e.touches[0] : e;
+      startX = t.clientX;
+      startY = t.clientY;
+      tracking = true;
+    };
+    const onEnd = (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+        scrollFeatures(dx < 0 ? 1 : -1);
+      }
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [totalPages]);
+
+  // Force light theme while on the landing page; restore on unmount.
+  useEffect(() => {
+    const root = document.documentElement;
+    const prev = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', 'light');
+    return () => {
+      if (prev) root.setAttribute('data-theme', prev);
+      else root.removeAttribute('data-theme');
+    };
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Cursor drag-follow on hero
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let visible = false;
+    let raf = 0;
+
+    const tick = () => {
+      // Ease toward target ~15% per frame for a smooth drag.
+      currentX += (targetX - currentX) * 0.15;
+      currentY += (targetY - currentY) * 0.15;
+      hero.style.setProperty('--lp-cx', `${currentX}px`);
+      hero.style.setProperty('--lp-cy', `${currentY}px`);
+      raf = requestAnimationFrame(tick);
+    };
+
+    const onMove = (e) => {
+      const rect = hero.getBoundingClientRect();
+      targetX = e.clientX - rect.left;
+      targetY = e.clientY - rect.top;
+      if (!visible) {
+        // Snap on first entry so the dot doesn't fly in from 0,0.
+        currentX = targetX;
+        currentY = targetY;
+        visible = true;
+        hero.style.setProperty('--lp-cursor-opacity', '1');
+      }
+    };
+    const onLeave = () => {
+      visible = false;
+      hero.style.setProperty('--lp-cursor-opacity', '0');
+    };
+
+    hero.addEventListener('pointermove', onMove);
+    hero.addEventListener('pointerleave', onLeave);
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      hero.removeEventListener('pointermove', onMove);
+      hero.removeEventListener('pointerleave', onLeave);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
 
   const handleCTA = () => {
     if (isSignedIn) {
@@ -126,18 +267,21 @@ export default function Landing() {
   return (
     <div className="lp">
       {/* Nav */}
-      <nav className="lp-nav">
+      <nav className={`lp-nav${scrolled ? ' lp-nav-scrolled' : ' lp-nav-over-hero'}`}>
         <div className="lp-nav-inner">
           <div className="lp-nav-brand">
-            <img src={theme === 'dark' ? logoDarkSrc : logoSrc} alt="" className="lp-nav-logo" />
+            <img src={scrolled ? logoSrc : logoDarkSrc} alt="" className="lp-nav-logo" />
             <span className="lp-nav-name">Axis Analytics</span>
           </div>
           <div className="lp-nav-actions">
-            <button className="lp-theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-              {theme === 'light' ? '🌙' : '☀️'}
-            </button>
             {isSignedIn ? (
-              <button className="lp-nav-cta" onClick={handleCTA}>Open App</button>
+              <>
+                <button className="lp-nav-cta" onClick={handleCTA}>Open App</button>
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{ elements: { avatarBox: 'cl-avatar-box' } }}
+                />
+              </>
             ) : (
               <>
                 <SignInButton mode="modal">
@@ -153,53 +297,8 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="lp-hero">
-        {/* Ambient glow */}
-        <div className="lp-hero-glow" aria-hidden="true" />
-
-        {/* Tilted full-court underlay */}
-        <div className="lp-hero-court-wrap" aria-hidden="true">
-          <svg
-            className="lp-hero-court"
-            viewBox="0 0 940 500"
-            preserveAspectRatio="xMidYMid meet"
-            focusable="false"
-          >
-            {/* Outer court */}
-            <rect x="10" y="10" width="920" height="480" rx="4" />
-            {/* Center line */}
-            <line x1="470" y1="10" x2="470" y2="490" />
-            {/* Center circles */}
-            <circle cx="470" cy="250" r="60" />
-            <circle cx="470" cy="250" r="24" />
-
-            {/* LEFT END */}
-            {/* Key (paint) */}
-            <rect x="10" y="160" width="190" height="180" />
-            {/* Free throw circle (solid front half) */}
-            <path d="M 200 190 A 60 60 0 0 1 200 310" />
-            {/* Free throw circle (dashed back half) */}
-            <path d="M 200 190 A 60 60 0 0 0 200 310" strokeDasharray="6 6" />
-            {/* Backboard */}
-            <line x1="50" y1="220" x2="50" y2="280" strokeWidth="3" />
-            {/* Rim */}
-            <circle cx="60" cy="250" r="9" />
-            {/* Restricted area arc */}
-            <path d="M 69 230 A 22 22 0 0 1 69 270" />
-            {/* Three-point arc */}
-            <path d="M 10 80 L 70 80 A 230 230 0 0 1 70 420 L 10 420" />
-
-            {/* RIGHT END (mirrored) */}
-            <rect x="740" y="160" width="190" height="180" />
-            <path d="M 740 190 A 60 60 0 0 0 740 310" />
-            <path d="M 740 190 A 60 60 0 0 1 740 310" strokeDasharray="6 6" />
-            <line x1="890" y1="220" x2="890" y2="280" strokeWidth="3" />
-            <circle cx="880" cy="250" r="9" />
-            <path d="M 871 230 A 22 22 0 0 0 871 270" />
-            <path d="M 930 80 L 870 80 A 230 230 0 0 0 870 420 L 930 420" />
-          </svg>
-        </div>
-
+      <section className="lp-hero" ref={heroRef}>
+        <div className="lp-hero-cursor" aria-hidden="true" />
         <div className="lp-hero-inner">
           <div className="lp-badge">🏀 Advanced analytics for NAIA basketball</div>
           <h1 className="lp-hero-h1">
@@ -222,6 +321,7 @@ export default function Landing() {
             <span className="lp-hero-proof-check">✓</span> Free to explore
           </div>
         </div>
+
       </section>
 
       {/* Stats bar */}
@@ -280,65 +380,65 @@ export default function Landing() {
       {/* Features */}
       <section className="lp-features" id="features">
         <div className="lp-features-inner">
-          <h2 className="lp-section-h2">Built on the numbers that matter</h2>
-          <p className="lp-section-sub">
+          <h2 className="lp-section-h2 lp-section-h2-dark">Built on the numbers that matter</h2>
+          <p className="lp-section-sub lp-section-sub-dark lp-nowrap">
             Every metric calculated from real box score data. No estimates, no filler.
           </p>
-          <div className="lp-features-grid">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="lp-feature-card">
-                <span className="lp-feature-icon">{f.icon}</span>
-                <h3 className="lp-feature-title">{f.title}</h3>
-                <p className="lp-feature-desc">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section className="lp-pricing" id="pricing">
-        <div className="lp-pricing-inner">
-          <h2 className="lp-section-h2">Simple pricing</h2>
-          <p className="lp-section-sub">
-            Start free. Upgrade whenever you want more.
-          </p>
-          <div className="lp-pricing-grid">
-            {PRICING.map((tier) => (
+          <div className="lp-features-carousel">
+            <button
+              type="button"
+              className="lp-features-arrow lp-features-arrow-left"
+              onClick={() => scrollFeatures(-1)}
+              aria-label="Previous features"
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div className="lp-features-viewport" ref={featuresViewportRef}>
               <div
-                key={tier.name}
-                className={`lp-pricing-card${tier.highlighted ? ' lp-pricing-card-featured' : ''}`}
+                className="lp-features-track"
+                ref={featuresScrollRef}
+                style={{
+                  transform: `translateX(calc(${-currentPage} * (var(--viewport-w, 0px) + 1.25rem)))`,
+                  '--per-page': perPage,
+                  '--viewport-w': `${viewportW}px`,
+                }}
               >
-                {tier.highlighted && <div className="lp-pricing-badge">Most popular</div>}
-                <h3 className="lp-pricing-name">{tier.name}</h3>
-                <div className="lp-pricing-price-row">
-                  <span className="lp-pricing-price">{tier.price}</span>
-                  <span className="lp-pricing-cadence">{tier.cadence}</span>
-                </div>
-                <p className="lp-pricing-tagline">{tier.tagline}</p>
-                <ul className="lp-pricing-features">
-                  {tier.features.map((f) => (
-                    <li key={f}>{f}</li>
-                  ))}
-                </ul>
-                {isSignedIn ? (
-                  <button
-                    className={`lp-pricing-cta${tier.highlighted ? ' lp-pricing-cta-featured' : ''}`}
-                    onClick={handleCTA}
-                  >
-                    Open Dashboard
-                  </button>
-                ) : (
-                  <SignInButton mode="modal">
-                    <button
-                      className={`lp-pricing-cta${tier.highlighted ? ' lp-pricing-cta-featured' : ''}`}
-                    >
-                      {tier.cta}
-                    </button>
-                  </SignInButton>
-                )}
+                {FEATURES.map((f) => (
+                  <div key={f.title} className="lp-feature-card">
+                    <div className="lp-feature-preview">{f.preview}</div>
+                    <div className="lp-feature-body">
+                      <span className="lp-feature-tag">{f.tag}</span>
+                      <h3 className="lp-feature-title">{f.title}</h3>
+                      <p className="lp-feature-desc">{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <button
+              type="button"
+              className="lp-features-arrow lp-features-arrow-right"
+              onClick={() => scrollFeatures(1)}
+              aria-label="Next features"
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div className="lp-features-dots" role="tablist" aria-label="Feature pages">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`lp-features-dot${i === currentPage ? ' lp-features-dot-active' : ''}`}
+                  onClick={() => setFeaturePage(i)}
+                  aria-label={`Go to page ${i + 1}`}
+                  aria-selected={i === currentPage}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -360,7 +460,7 @@ export default function Landing() {
       <footer className="lp-footer">
         <div className="lp-footer-inner">
           <div className="lp-footer-brand">
-            <img src={theme === 'dark' ? logoDarkSrc : logoSrc} alt="" className="lp-footer-logo" />
+            <img src={logoSrc} alt="" className="lp-footer-logo" />
             <span>Axis Analytics</span>
           </div>
           <p className="lp-footer-copy">© {new Date().getFullYear()} Axis Analytics. All rights reserved.</p>
