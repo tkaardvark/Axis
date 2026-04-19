@@ -8,48 +8,80 @@ import './Landing.css';
 const FEATURES = [
   {
     icon: '📊',
-    title: 'Advanced Team Ratings',
-    desc: 'Adjusted offensive & defensive ratings, net rating, RPI, strength of schedule — all calculated from real box score data.',
-  },
-  {
-    icon: '🏀',
-    title: 'Player Analytics',
-    desc: 'Per-game splits, shooting percentages, clutch stats, and filterable leaderboards for every NAIA player.',
+    title: 'Efficiency Ratings',
+    desc: 'Adjusted offensive and defensive ratings, net rating, pace, and effective FG% — possession-based metrics that cut through noise in the box score.',
   },
   {
     icon: '🏆',
-    title: 'Tournament Bracket',
-    desc: 'Live bracket tracker with quadrant records, seed projections, and conference tournament results.',
-  },
-  {
-    icon: '🔍',
-    title: 'Scout & Matchup Tool',
-    desc: 'Head-to-head comparisons, game logs, and statistical profiles to prep for any opponent.',
+    title: 'Bracket Forecasting',
+    desc: 'Seed projections, quadrant records (Q1/Q2/Q3/Q4), and live tournament brackets updated as results come in.',
   },
   {
     icon: '📈',
-    title: 'Conference Breakdowns',
-    desc: 'Conference standings, RPI rankings, strength comparisons, and head-to-head matrices.',
+    title: 'RPI & Strength of Schedule',
+    desc: "The NAIA's official RPI formula calculated daily, plus SOS, opponent win %, and conference-adjusted rankings.",
   },
   {
-    icon: '⚡',
-    title: 'Updated Daily',
-    desc: 'Box scores scraped and processed multiple times daily — never coach off stale numbers.',
+    icon: '🏀',
+    title: 'Player Leaderboards',
+    desc: 'Per-game splits, shooting percentages, clutch stats, and filterable rankings for every NAIA player.',
+  },
+  {
+    icon: '🔍',
+    title: 'Scout & Matchup',
+    desc: 'Head-to-head comparisons, game-by-game logs, and statistical profiles for prepping any opponent.',
+  },
+  {
+    icon: '🗺️',
+    title: 'Conference Breakdowns',
+    desc: 'Standings, RPI rankings, head-to-head matrices, and strength comparisons across all 21 NAIA conferences.',
   },
 ];
 
-const TESTIMONIALS = [
+const PRICING = [
   {
-    quote: "Finally, real analytics for NAIA basketball. This is the edge we've been missing.",
-    author: 'NAIA Head Coach',
+    name: 'Free',
+    price: '$0',
+    cadence: 'forever',
+    tagline: 'Explore team ratings and rankings.',
+    features: [
+      'Full team ratings & rankings',
+      'Conference standings',
+      'RPI & Net Rating leaderboards',
+      'Basic team pages',
+    ],
+    cta: 'Get Started',
+    highlighted: false,
   },
   {
-    quote: "I use Axis before every film session. The matchup tool alone is worth it.",
-    author: 'Assistant Coach',
+    name: 'Fan',
+    price: '$30',
+    cadence: '/month',
+    tagline: 'For dedicated followers of the game.',
+    features: [
+      'Everything in Free',
+      'Player stats & leaderboards',
+      'Matchup & head-to-head tool',
+      'Bracket forecasting',
+      'Box score drill-downs',
+    ],
+    cta: 'Start Fan Access',
+    highlighted: true,
   },
   {
-    quote: "As a fan, I can finally see which teams are actually good — not just who has the best record.",
-    author: 'NAIA Basketball Fan',
+    name: 'Coach',
+    price: '$300',
+    cadence: '/year',
+    tagline: 'For programs and staff.',
+    features: [
+      'Everything in Fan',
+      'Full scout report access',
+      'Lineup & rotation analytics',
+      'Advanced splits (home/away, Q1-Q4)',
+      'Priority support',
+    ],
+    cta: 'Get Coach Access',
+    highlighted: false,
   },
 ];
 
@@ -122,26 +154,72 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="lp-hero">
+        {/* Ambient glow */}
+        <div className="lp-hero-glow" aria-hidden="true" />
+
+        {/* Tilted full-court underlay */}
+        <div className="lp-hero-court-wrap" aria-hidden="true">
+          <svg
+            className="lp-hero-court"
+            viewBox="0 0 940 500"
+            preserveAspectRatio="xMidYMid meet"
+            focusable="false"
+          >
+            {/* Outer court */}
+            <rect x="10" y="10" width="920" height="480" rx="4" />
+            {/* Center line */}
+            <line x1="470" y1="10" x2="470" y2="490" />
+            {/* Center circles */}
+            <circle cx="470" cy="250" r="60" />
+            <circle cx="470" cy="250" r="24" />
+
+            {/* LEFT END */}
+            {/* Key (paint) */}
+            <rect x="10" y="160" width="190" height="180" />
+            {/* Free throw circle (solid front half) */}
+            <path d="M 200 190 A 60 60 0 0 1 200 310" />
+            {/* Free throw circle (dashed back half) */}
+            <path d="M 200 190 A 60 60 0 0 0 200 310" strokeDasharray="6 6" />
+            {/* Backboard */}
+            <line x1="50" y1="220" x2="50" y2="280" strokeWidth="3" />
+            {/* Rim */}
+            <circle cx="60" cy="250" r="9" />
+            {/* Restricted area arc */}
+            <path d="M 69 230 A 22 22 0 0 1 69 270" />
+            {/* Three-point arc */}
+            <path d="M 10 80 L 70 80 A 230 230 0 0 1 70 420 L 10 420" />
+
+            {/* RIGHT END (mirrored) */}
+            <rect x="740" y="160" width="190" height="180" />
+            <path d="M 740 190 A 60 60 0 0 0 740 310" />
+            <path d="M 740 190 A 60 60 0 0 1 740 310" strokeDasharray="6 6" />
+            <line x1="890" y1="220" x2="890" y2="280" strokeWidth="3" />
+            <circle cx="880" cy="250" r="9" />
+            <path d="M 871 230 A 22 22 0 0 0 871 270" />
+            <path d="M 930 80 L 870 80 A 230 230 0 0 0 870 420 L 930 420" />
+          </svg>
+        </div>
+
         <div className="lp-hero-inner">
-          <div className="lp-badge">🏀 Built for NAIA Basketball</div>
+          <div className="lp-badge">🏀 Advanced analytics for NAIA basketball</div>
           <h1 className="lp-hero-h1">
-            The Analytics Edge<br />
-            <span className="lp-hero-accent">Your Program Deserves</span>
+            Every possession.<br />
+            <span className="lp-hero-accent">Every rating. Every team.</span>
           </h1>
           <p className="lp-hero-sub">
-            Advanced ratings, player analytics, matchup tools, and tournament projections — 
-            all built from real box score data, updated daily. Stop guessing. Start winning.
+            RPI, strength of schedule, adjusted efficiency ratings, and live bracket forecasting —
+            calculated from every box score across all 21 NAIA conferences.
           </p>
           <div className="lp-hero-ctas">
             {ctaButton}
             <a href="#features" className="lp-hero-link">See what's inside ↓</a>
           </div>
           <div className="lp-hero-proof">
-            <span className="lp-hero-proof-check">✓</span> Free to start
+            <span className="lp-hero-proof-check">✓</span> 250+ teams
             <span className="lp-hero-proof-sep">·</span>
-            <span className="lp-hero-proof-check">✓</span> No credit card required
+            <span className="lp-hero-proof-check">✓</span> Updated daily
             <span className="lp-hero-proof-sep">·</span>
-            <span className="lp-hero-proof-check">✓</span> 250+ NAIA teams
+            <span className="lp-hero-proof-check">✓</span> Free to explore
           </div>
         </div>
       </section>
@@ -161,14 +239,14 @@ export default function Landing() {
       {/* Preview */}
       <section className="lp-preview">
         <div className="lp-preview-inner">
-          <h2 className="lp-section-h2">See the game differently</h2>
+          <h2 className="lp-section-h2">The rankings you've been waiting for</h2>
           <p className="lp-section-sub">
-            Explore team rankings powered by advanced metrics — completely free. 
-            Sign up to unlock player stats, matchup tools, and more.
+            Team rankings built from adjusted efficiency and RPI — not record alone.
+            Free to explore.
           </p>
           <div className="lp-preview-cta-row">
             <button className="lp-cta-btn-secondary" onClick={() => navigate('/app')}>
-              Try the Teams Page — Free →
+              Explore Team Rankings →
             </button>
           </div>
           <div className="lp-preview-box">
@@ -202,9 +280,9 @@ export default function Landing() {
       {/* Features */}
       <section className="lp-features" id="features">
         <div className="lp-features-inner">
-          <h2 className="lp-section-h2">Everything you need to break down the game</h2>
+          <h2 className="lp-section-h2">Built on the numbers that matter</h2>
           <p className="lp-section-sub">
-            Purpose-built for NAIA basketball. No fluff, no bloat — just the numbers that matter.
+            Every metric calculated from real box score data. No estimates, no filler.
           </p>
           <div className="lp-features-grid">
             {FEATURES.map((f) => (
@@ -218,43 +296,49 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Social proof */}
-      <section className="lp-social" id="testimonials">
-        <div className="lp-social-inner">
-          <h2 className="lp-section-h2">Trusted by coaches and fans</h2>
-          <div className="lp-testimonials">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="lp-testimonial">
-                <p className="lp-testimonial-quote">"{t.quote}"</p>
-                <p className="lp-testimonial-author">— {t.author}</p>
+      {/* Pricing */}
+      <section className="lp-pricing" id="pricing">
+        <div className="lp-pricing-inner">
+          <h2 className="lp-section-h2">Simple pricing</h2>
+          <p className="lp-section-sub">
+            Start free. Upgrade whenever you want more.
+          </p>
+          <div className="lp-pricing-grid">
+            {PRICING.map((tier) => (
+              <div
+                key={tier.name}
+                className={`lp-pricing-card${tier.highlighted ? ' lp-pricing-card-featured' : ''}`}
+              >
+                {tier.highlighted && <div className="lp-pricing-badge">Most popular</div>}
+                <h3 className="lp-pricing-name">{tier.name}</h3>
+                <div className="lp-pricing-price-row">
+                  <span className="lp-pricing-price">{tier.price}</span>
+                  <span className="lp-pricing-cadence">{tier.cadence}</span>
+                </div>
+                <p className="lp-pricing-tagline">{tier.tagline}</p>
+                <ul className="lp-pricing-features">
+                  {tier.features.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+                {isSignedIn ? (
+                  <button
+                    className={`lp-pricing-cta${tier.highlighted ? ' lp-pricing-cta-featured' : ''}`}
+                    onClick={handleCTA}
+                  >
+                    Open Dashboard
+                  </button>
+                ) : (
+                  <SignInButton mode="modal">
+                    <button
+                      className={`lp-pricing-cta${tier.highlighted ? ' lp-pricing-cta-featured' : ''}`}
+                    >
+                      {tier.cta}
+                    </button>
+                  </SignInButton>
+                )}
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="lp-how">
-        <div className="lp-how-inner">
-          <h2 className="lp-section-h2">Up and running in 30 seconds</h2>
-          <div className="lp-how-steps">
-            <div className="lp-how-step">
-              <div className="lp-how-num">1</div>
-              <h3>Create your free account</h3>
-              <p>Sign up with email or Google — no credit card needed.</p>
-            </div>
-            <div className="lp-how-arrow">→</div>
-            <div className="lp-how-step">
-              <div className="lp-how-num">2</div>
-              <h3>Explore your team</h3>
-              <p>Find any NAIA team and dive into their advanced stats.</p>
-            </div>
-            <div className="lp-how-arrow">→</div>
-            <div className="lp-how-step">
-              <div className="lp-how-num">3</div>
-              <h3>Gain the edge</h3>
-              <p>Use matchup tools, player data, and projections to prepare smarter.</p>
-            </div>
           </div>
         </div>
       </section>
@@ -262,14 +346,13 @@ export default function Landing() {
       {/* Final CTA */}
       <section className="lp-final-cta">
         <div className="lp-final-inner">
-          <h2 className="lp-final-h2">Ready to see the game differently?</h2>
+          <h2 className="lp-final-h2">Start exploring the numbers.</h2>
           <p className="lp-final-sub">
-            Join coaches and fans already using Axis Analytics to break down NAIA basketball.
+            Free access to ratings, rankings, and conference breakdowns. No credit card required.
           </p>
           <div className="lp-final-actions">
             {ctaButton}
           </div>
-          <p className="lp-final-note">Free forever for basic access. No credit card required.</p>
         </div>
       </section>
 

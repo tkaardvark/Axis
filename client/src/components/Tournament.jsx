@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react
 import './Tournament.css';
 import TeamLogo from './TeamLogo';
 import SkeletonLoader from './SkeletonLoader';
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 
 // Lazy-load Bracketcast so it only downloads when that tab is active
 const Bracketcast = lazy(() => import('./Bracketcast'));

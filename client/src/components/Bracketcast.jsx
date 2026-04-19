@@ -3,7 +3,7 @@ import './Bracketcast.css';
 import TeamLogo from './TeamLogo';
 import SkeletonLoader from './SkeletonLoader';
 import StatGroupTabs from './StatGroupTabs';
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { TOOLTIPS } from '../utils/tooltips';
 import { exportToCSV } from '../utils/csv';
 

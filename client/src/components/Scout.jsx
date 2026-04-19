@@ -6,7 +6,7 @@ import TeamRadarChart from './TeamRadarChart';
 import SeasonTrajectoryChart from './SeasonTrajectoryChart';
 import BoxScoreModal from './BoxScoreModal';
 import Matchup from './Matchup';
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { normalizeYear, normalizePosition } from '../utils/normalizers';
 import { formatColumnValue, formatDate } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
@@ -111,12 +111,12 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
       setLoading(true);
       try {
         const [splitsRes, scheduleRes, percentilesRes, rosterRes, lineupsRes, lineupStatsRes] = await Promise.all([
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/splits?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/schedule?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/percentiles?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/roster?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/lineups?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${selectedTeamId}/lineup-stats?season=${season}${sourceParam}`)
+          apiFetch(`${API_URL}/api/teams/${selectedTeamId}/splits?season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/teams/${selectedTeamId}/schedule?season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/teams/${selectedTeamId}/percentiles?season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/teams/${selectedTeamId}/roster?season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/teams/${selectedTeamId}/lineups?season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/teams/${selectedTeamId}/lineup-stats?season=${season}${sourceParam}`)
         ]);
         const splitsData = await splitsRes.json();
         const scheduleData = await scheduleRes.json();

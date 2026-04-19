@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './TeamModal.css';
 import TeamLogo from './TeamLogo';
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { formatColumnValue, formatDate } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
@@ -35,8 +35,8 @@ function TeamModal({ team, season = '2025-26', onClose, sourceParam = '' }) {
       setError(null);
       try {
         const [splitsRes, scheduleRes] = await Promise.all([
-          fetch(`${API_URL}/api/teams/${team.team_id}/splits?season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/teams/${team.team_id}/schedule?season=${season}${sourceParam}`)
+          apiFetch(`${API_URL}/api/teams/${team.team_id}/splits?season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/teams/${team.team_id}/schedule?season=${season}${sourceParam}`)
         ]);
         const splitsData = await splitsRes.json();
         const scheduleData = await scheduleRes.json();

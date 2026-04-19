@@ -4,7 +4,7 @@ import TeamLogo from './TeamLogo';
 import ViewToggle from './ViewToggle';
 import PlayerVisualizations from './PlayerVisualizations';
 
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { normalizeYear, normalizePosition } from '../utils/normalizers';
 import { TOOLTIPS } from '../utils/tooltips';
 import SkeletonLoader from './SkeletonLoader';

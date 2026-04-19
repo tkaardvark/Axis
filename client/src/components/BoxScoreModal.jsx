@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import './BoxScoreModal.css';
 import TeamLogo from './TeamLogo';
 import ScoreChart from './ScoreChart';
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { formatDateWithYear } from '../utils/formatters';
 import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
@@ -152,7 +152,7 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_URL}/api/games/${gameId}/boxscore?season=${season}${sourceParam}`);
+        const res = await apiFetch(`${API_URL}/api/games/${gameId}/boxscore?season=${season}${sourceParam}`);
         if (!res.ok) throw new Error('Failed to fetch');
         const json = await res.json();
         setData(json);

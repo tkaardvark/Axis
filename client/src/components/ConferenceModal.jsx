@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './ConferenceModal.css';
 import TeamLogo from './TeamLogo';
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import SkeletonLoader from './SkeletonLoader';
 import useFocusTrap from '../hooks/useFocusTrap';
 

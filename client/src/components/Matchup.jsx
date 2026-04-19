@@ -14,7 +14,7 @@ import './Matchup.css';
 import TeamLogo from './TeamLogo';
 import MatchupComparisonBar from './MatchupComparisonBar';
 
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { formatDate } from '../utils/formatters';
 import { getPercentile } from '../utils/percentile';
 import SkeletonLoader from './SkeletonLoader';
@@ -83,7 +83,7 @@ function Matchup({ league, season, teams = [], conferences = [], sourceParam = '
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_URL}/api/matchup?team1=${team1Id}&team2=${team2Id}&season=${season}&league=${league}${sourceParam}`);
+        const res = await apiFetch(`${API_URL}/api/matchup?team1=${team1Id}&team2=${team2Id}&season=${season}&league=${league}${sourceParam}`);
         if (!res.ok) throw new Error('Failed to fetch');
         const json = await res.json();
         setData(json);

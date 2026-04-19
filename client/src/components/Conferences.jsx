@@ -36,7 +36,7 @@ class ConferenceErrorBoundary extends Component {
   }
 }
 
-import { API_URL } from '../utils/api';
+import { API_URL, apiFetch } from '../utils/api';
 import { formatDate } from '../utils/formatters';
 
 // Profile comparison metrics (conference avg vs national avg)
@@ -128,7 +128,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
     const fetchRankings = async () => {
       setRankingsLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/conference-rankings?league=${league}&season=${season}${sourceParam}`);
+        const res = await apiFetch(`${API_URL}/api/conference-rankings?league=${league}&season=${season}${sourceParam}`);
         const data = await res.json();
         setConfRankings(data);
       } catch (err) {
@@ -146,7 +146,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
     const fetchNetScatter = async () => {
       setNetScatterLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/conference-rpi-scatter?league=${league}&season=${season}${sourceParam}`);
+        const res = await apiFetch(`${API_URL}/api/conference-rpi-scatter?league=${league}&season=${season}${sourceParam}`);
         const data = await res.json();
         setNetScatterData(data);
       } catch (err) {
@@ -171,9 +171,9 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
       setLoading(true);
       try {
         const [summaryRes, nationalRes, h2hRes] = await Promise.all([
-          fetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/summary?league=${league}&season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/national-averages?league=${league}&season=${season}${sourceParam}`),
-          fetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/head-to-head?league=${league}&season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/summary?league=${league}&season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/national-averages?league=${league}&season=${season}${sourceParam}`),
+          apiFetch(`${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/head-to-head?league=${league}&season=${season}${sourceParam}`),
         ]);
         const summaryData = await summaryRes.json();
         const nationalData = await nationalRes.json();
