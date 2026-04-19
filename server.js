@@ -49,6 +49,7 @@ app.use(helmet({
         'https://api.axisbasketball.com',
         'https://*.clerk.accounts.dev',
         'https://clerk.axisbasketball.com',
+        'https://challenges.cloudflare.com',
       ],
       'img-src': ["'self'", 'data:', 'https://img.clerk.com', "https://cdn.prestosports.com"],
       'worker-src': ["'self'", 'blob:'],
