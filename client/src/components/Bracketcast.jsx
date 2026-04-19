@@ -83,7 +83,7 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '', embedded =
         if (asOfDate) {
           url += `&asOfDate=${asOfDate}`;
         }
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         const result = await response.json();
         setData(result);
       } catch (err) {

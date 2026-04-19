@@ -205,7 +205,7 @@ function App() {
         }
       }
 
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       const teamsData = await response.json();
       setTeams(Array.isArray(teamsData) ? teamsData : []);
     } catch (err) {

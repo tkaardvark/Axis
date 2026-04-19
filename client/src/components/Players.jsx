@@ -141,7 +141,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
     const fetchTeams = async () => {
       try {
         const url = `${API_URL}/api/teams/list?league=${league}&season=${season}`;
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         const data = await response.json();
         // Sort teams alphabetically by name
         const sortedTeams = (Array.isArray(data) ? data : []).sort((a, b) => 
@@ -188,7 +188,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
         url += `&year=${encodeURIComponent(filters.year)}`;
       }
 
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       const data = await response.json();
       setRawPlayers(data.players || []);
     } catch (err) {
@@ -228,7 +228,7 @@ function Players({ league, season, conferences, sourceParam = '' }) {
     try {
       // Fetch all players for visualizations (no limit)
       const url = `${API_URL}/api/players?league=${league}&season=${season}${sourceParam}&sort_by=pts_pg&sort_order=DESC&limit=10000&min_gp=0`;
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       const data = await response.json();
       setAllPlayers(data.players || []);
     } catch (error) {

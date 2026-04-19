@@ -41,7 +41,7 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick,
     const fetchTeams = async () => {
       setLoading(true);
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_URL}/api/teams?league=${league}&season=${season}&conference=${encodeURIComponent(conferenceName)}${sourceParam}`
         );
         const data = await response.json();
@@ -65,7 +65,7 @@ function ConferenceModal({ conferenceName, league, season, onClose, onTeamClick,
       setGamesLoading(true);
       try {
         const dateStr = formatDateForAPI(selectedDate);
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_URL}/api/conferences/${encodeURIComponent(conferenceName)}/games?league=${league}&season=${season}&date=${dateStr}${sourceParam}`
         );
         const data = await response.json();

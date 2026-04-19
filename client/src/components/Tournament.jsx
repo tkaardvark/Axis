@@ -22,7 +22,7 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
       setError(null);
       try {
         const url = `${API_URL}/api/tournament?league=${league}&season=${season}${sourceParam}`;
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         const result = await response.json();
         if (result.error) {
           setError(result.error);

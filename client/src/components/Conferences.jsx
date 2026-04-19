@@ -199,7 +199,7 @@ function Conferences({ league, season, conferences = [], teams = [], sourceParam
     const fetchSchedule = async () => {
       setScheduleLoading(true);
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `${API_URL}/api/conferences/${encodeURIComponent(selectedConference)}/games?league=${league}&season=${season}${sourceParam}`
         );
         const data = await res.json();
