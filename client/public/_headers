@@ -1,0 +1,6 @@
+/*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; upgrade-insecure-requests; script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.axisbasketball.com https://challenges.cloudflare.com; script-src-elem 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.axisbasketball.com https://challenges.cloudflare.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.axisbasketball.com https://*.clerk.accounts.dev https://clerk.axisbasketball.com https://challenges.cloudflare.com wss://*.clerk.accounts.dev; frame-src 'self' https://*.clerk.accounts.dev https://clerk.axisbasketball.com https://challenges.cloudflare.com
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
