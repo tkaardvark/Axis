@@ -92,6 +92,7 @@ if (process.env.NODE_ENV === 'production') {
       return cb(new Error(`CORS blocked: ${origin}`));
     },
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   }));
 } else {
   app.use(cors());

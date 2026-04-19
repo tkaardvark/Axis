@@ -10,8 +10,19 @@ export async function apiFetch(input, init = {}) {
   let token = null;
   try {
     const clerk = typeof window !== 'undefined' ? window.Clerk : null;
-    if (clerk?.session?.getToken) {
-      token = await clerk.session.getToken();
+    if (clerk) {
+      // Wait until Clerk has finished loading so we don't race past a valid
+      // session that hasn't hydrated yet.
+      if (!clerk.loaded && typeof clerk.load === 'function') {
+        try {
+          await clerk.load();
+        } catch {
+          // ignore — will fall through and attempt without token
+        }
+      }
+      if (clerk.session?.getToken) {
+        token = await clerk.session.getToken();
+      }
     }
   } catch {
     // ignore — fall through with no token
