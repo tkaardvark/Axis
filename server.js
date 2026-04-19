@@ -50,7 +50,7 @@ app.use(helmet({
         'https://*.clerk.accounts.dev',
         'https://clerk.axisbasketball.com',
       ],
-      'img-src': ["'self'", 'data:', 'https://img.clerk.com'],
+      'img-src': ["'self'", 'data:', 'https://img.clerk.com', "https://cdn.prestosports.com"],
       'worker-src': ["'self'", 'blob:'],
       'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
