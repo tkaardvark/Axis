@@ -11,7 +11,7 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('bracket'); // 'bracket', 'pods', 'rankings', 'bracketcast'
+  const [view, setView] = useState('bracket'); // 'bracket', 'rankings', 'bracketcast'
   const [expandedPod, setExpandedPod] = useState(null);
   const [predictionMethod, setPredictionMethod] = useState('none'); // 'none', 'score', 'rpi', 'netRating', 'powerIndex'
   const predictionMode = predictionMethod !== 'none';
@@ -51,13 +51,6 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
     if (rank <= 8) return 'difficulty-tough';
     if (rank <= 12) return 'difficulty-moderate';
     return 'difficulty-light';
-  };
-
-  const getDifficultyLabel = (rank) => {
-    if (rank <= 4) return 'Elite';
-    if (rank <= 8) return 'Tough';
-    if (rank <= 12) return 'Moderate';
-    return 'Favorable';
   };
 
   // Build a lookup of actual results: key = sorted team id pair → result
@@ -347,9 +340,6 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
           <button className={`page-tab ${view === 'bracket' ? 'active' : ''}`} onClick={() => setView('bracket')}>
             Bracket
           </button>
-          <button className={`page-tab ${view === 'pods' ? 'active' : ''}`} onClick={() => setView('pods')}>
-            Pods
-          </button>
           <button className={`page-tab ${view === 'rankings' ? 'active' : ''}`} onClick={() => setView('rankings')}>
             Pod Rankings
           </button>
@@ -387,59 +377,6 @@ function Tournament({ league, season, onTeamClick, sourceParam = '' }) {
           predictionMethod={predictionMethod}
           getActualResult={getActualResult}
         />
-      ) : view === 'pods' ? (
-        <div className="tournament-pods-view">
-          {data.quadrants.map((quadrant) => (
-            <div key={quadrant.name} className="tournament-quadrant">
-              <h2 className="quadrant-title">
-                <span className="quadrant-icon">◆</span>
-                {quadrant.name} Quadrant
-              </h2>
-              <div className="quadrant-pods">
-                {quadrant.pods.map((pod, podIdx) => {
-                  const ranking = podRankings.find(
-                    p => p.hostCity === pod.hostCity && p.quadrant === quadrant.name
-                  );
-                  const strengthRank = ranking?.strengthRank || '-';
-                  const diffClass = getDifficultyClass(strengthRank);
-
-                  return (
-                    <div key={podIdx} className="tournament-pod">
-                      <div className="pod-header">
-                        <div className="pod-header-left">
-                          <span className={`pod-difficulty-badge ${diffClass}`}>
-                            #{strengthRank}
-                          </span>
-                          <div className="pod-header-info">
-                            <span className="pod-host-city">{pod.hostCity}, {pod.hostState}</span>
-                            <span className="pod-strength-label">{getDifficultyLabel(strengthRank)} • Avg RPI Rank: {ranking?.strength.avgRpiRank}</span>
-                          </div>
-                        </div>
-                        <div className="pod-combined-record">
-                          {pod.strength?.combinedRecord}
-                        </div>
-                      </div>
-                      <div className="pod-matchups">
-                        <div className="pod-matchup">
-                          <div className="matchup-label">Game 1</div>
-                          <PodTeamRow team={pod.teams[0]} onTeamClick={onTeamClick} />
-                          <div className="matchup-vs">VS</div>
-                          <PodTeamRow team={pod.teams[3]} onTeamClick={onTeamClick} />
-                        </div>
-                        <div className="pod-matchup">
-                          <div className="matchup-label">Game 2</div>
-                          <PodTeamRow team={pod.teams[1]} onTeamClick={onTeamClick} />
-                          <div className="matchup-vs">VS</div>
-                          <PodTeamRow team={pod.teams[2]} onTeamClick={onTeamClick} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
       ) : view === 'rankings' ? (
         <div className="tournament-rankings">
           <p className="rankings-description">
@@ -848,33 +785,6 @@ function BracketSlot({ label, side }) {
   return (
     <div className="bracket-slot">
       <span className="bracket-tbd">{label}</span>
-    </div>
-  );
-}
-
-function PodTeamRow({ team, onTeamClick }) {
-  if (!team) return null;
-  return (
-    <div
-      className="pod-team-row"
-      onClick={() => onTeamClick?.({ team_id: team.teamId, name: team.name })}
-    >
-      <span className="pod-team-seed">#{team.seed}</span>
-      <TeamLogo logoUrl={team.logoUrl} teamName={team.name} />
-      <div className="pod-team-details">
-        <span className="pod-team-name">
-          {team.name}
-        </span>
-        <span className="pod-team-meta">
-          {team.record} • RPI: {team.rpiRank || '-'} • {team.conference}
-        </span>
-      </div>
-      <div className="pod-team-stats">
-        <span className="pod-stat">{team.rpi?.toFixed(4) || '-'}</span>
-        {team.distance != null && (
-          <span className="pod-team-distance">{team.distance} mi</span>
-        )}
-      </div>
     </div>
   );
 }

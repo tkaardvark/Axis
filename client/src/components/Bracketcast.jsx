@@ -64,9 +64,7 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '', embedded =
   const [data, setData] = useState({ teams: [], bracket: {}, pods: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('table'); // 'table', 'bracket', or 'pods'
   const [sort, setSort] = useState(BRACKETCAST_STAT_GROUPS['Primary Criteria'].defaultSort);
-  const [expandedTeams, setExpandedTeams] = useState(new Set()); // Track expanded teams in Seed Groups
   const [asOfDate, setAsOfDate] = useState(''); // User-selected cutoff date (empty = use all data)
   const [activeStatGroup, setActiveStatGroup] = useState('Primary Criteria');
 
@@ -188,18 +186,6 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '', embedded =
     return '';
   };
 
-  const toggleTeamExpanded = (teamId) => {
-    setExpandedTeams(prev => {
-      const next = new Set(prev);
-      if (next.has(teamId)) {
-        next.delete(teamId);
-      } else {
-        next.add(teamId);
-      }
-      return next;
-    });
-  };
-
   const handleStatGroupChange = (group) => {
     setActiveStatGroup(group);
     const config = BRACKETCAST_STAT_GROUPS[group];
@@ -256,27 +242,6 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '', embedded =
         </div>
       )}
 
-      <div className="page-tabs">
-          <button
-            className={`page-tab ${view === 'table' ? 'active' : ''}`}
-            onClick={() => setView('table')}
-          >
-            Selection Table
-          </button>
-          <button
-            className={`page-tab ${view === 'pods' ? 'active' : ''}`}
-            onClick={() => setView('pods')}
-          >
-            Opening Round Pods
-          </button>
-          <button
-            className={`page-tab ${view === 'bracket' ? 'active' : ''}`}
-            onClick={() => setView('bracket')}
-          >
-            Seed Groups
-          </button>
-        </div>
-
       <div className="bracketcast-controls">
 
         <div className="date-filter">
@@ -332,246 +297,106 @@ function Bracketcast({ league, season, onTeamClick, sourceParam = '', embedded =
         </button>
       </div>
 
-      {view === 'table' ? (
-        <>
-        <StatGroupTabs
-          active={activeStatGroup}
-          onChange={handleStatGroupChange}
-          groups={BRACKETCAST_TAB_GROUPS}
-        />
-        <div className="bracketcast-table-wrapper">
-          <div className="bracketcast-table-container">
-            <table className="bracketcast-table">
-              <thead>
-                <tr>
-                  {COLUMNS.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`col-${col.key} ${col.sortKey ? 'sortable' : ''}`}
-                      onClick={() => col.sortKey && handleSort(col)}
-                      title={TOOLTIPS[col.key] || col.label}
-                    >
-                      {col.label}{getSortIndicator(col)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTeams.map((team, index) => (
-                  <tr
-                    key={team.team_id}
-                    className={team.pr && team.pr <= 64 ? 'in-bracket' : 'bubble'}
+      <StatGroupTabs
+        active={activeStatGroup}
+        onChange={handleStatGroupChange}
+        groups={BRACKETCAST_TAB_GROUPS}
+      />
+      <div className="bracketcast-table-wrapper">
+        <div className="bracketcast-table-container">
+          <table className="bracketcast-table">
+            <thead>
+              <tr>
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`col-${col.key} ${col.sortKey ? 'sortable' : ''}`}
+                    onClick={() => col.sortKey && handleSort(col)}
+                    title={TOOLTIPS[col.key] || col.label}
                   >
-                    {COLUMNS.map((col) => {
-                      switch (col.key) {
-                        case 'rank':
-                          return <td key={col.key} className="col-rank">{index + 1}</td>;
-                        case 'team':
-                          return (
-                            <td key={col.key} className="col-team">
-                              <div className="team-info">
-                                <TeamLogo logoUrl={team.logo_url} teamName={team.name} />
-                                <div className="team-details">
-                                  <span
-                                    className="team-name team-name-clickable"
-                                    onClick={() => onTeamClick && onTeamClick(team)}
-                                  >
-                                    {team.name}
-                                    {team.is_conference_champion && <span className="champion-badge" title="Conference Champion (Auto-Bid)">🏆</span>}
-                                  </span>
-                                  <span className="team-conference">{team.conference || ''}</span>
-                                </div>
-                              </div>
-                            </td>
-                          );
-                        case 'area':
-                          return (
-                            <td key={col.key} className="col-area">
-                              <span className={`area-badge area-${team.area?.toLowerCase()}`}>{team.area}</span>
-                            </td>
-                          );
-                        case 'record':
-                          return <td key={col.key} className="col-record">{team.total_wins}-{team.total_losses}</td>;
-                        case 'q1':
-                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q1_wins, team.q1_losses, 1)}`}>{formatQuadrant(team.q1_wins, team.q1_losses)}</td>;
-                        case 'q2':
-                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q2_wins, team.q2_losses, 2)}`}>{formatQuadrant(team.q2_wins, team.q2_losses)}</td>;
-                        case 'q3':
-                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q3_wins, team.q3_losses, 3)}`}>{formatQuadrant(team.q3_wins, team.q3_losses)}</td>;
-                        case 'q4':
-                          return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q4_wins, team.q4_losses, 4)}`}>{formatQuadrant(team.q4_wins, team.q4_losses)}</td>;
-                        case 'qwp':
-                          return <td key={col.key} className="col-qwp">{team.qwp % 1 === 0 ? team.qwp.toFixed(0) : team.qwp.toFixed(1)}</td>;
-                        case 'naia_record':
-                          return <td key={col.key} className="col-naia_record">{team.naia_wins}-{team.naia_losses}</td>;
-                        case 'rpi':
-                          return <td key={col.key} className="col-rpi">{team.rpi ? team.rpi.toFixed(3) : '-'}</td>;
-                        case 'rpi_rank':
-                          return <td key={col.key} className="col-rpi_rank">{team.rpi_rank || '-'}</td>;
-                        case 'sos':
-                          return <td key={col.key} className="col-sos">{team.sos ? team.sos.toFixed(3) : '-'}</td>;
-                        case 'sos_rank':
-                          return <td key={col.key} className="col-sos_rank">{team.sos_rank || '-'}</td>;
-                        case 'pcr':
-                          return <td key={col.key} className="col-pcr">{team.pcr || '-'}</td>;
-                        case 'pr':
-                          return <td key={col.key} className="col-pr">{team.pr || '-'}</td>;
-                        case 'total_win_pct':
-                          return <td key={col.key} className="col-total_win_pct">{team.total_win_pct ? team.total_win_pct.toFixed(3) : '-'}</td>;
-                        case 'naia_win_pct':
-                          return <td key={col.key} className="col-naia_win_pct">{team.naia_win_pct ? team.naia_win_pct.toFixed(3) : '-'}</td>;
-                        case 'owp':
-                          return <td key={col.key} className="col-owp">{team.owp ? team.owp.toFixed(3) : '-'}</td>;
-                        case 'oowp':
-                          return <td key={col.key} className="col-oowp">{team.oowp ? team.oowp.toFixed(3) : '-'}</td>;
-                        default:
-                          return <td key={col.key}>-</td>;
-                      }
-                    })}
-                  </tr>
+                    {col.label}{getSortIndicator(col)}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        </>
-      ) : view === 'pods' ? (
-        <div className="pods-projection">
-          <p className="pods-description">
-            Opening round pods based on geography and conference separation.
-            Each #1 seed hosts their pod. Teams travel to the host site for the first two rounds.
-          </p>
-          <div className="pods-grid">
-            {data.pods?.map((pod) => (
-              <div key={pod.podNumber} className="pod-card">
-                <div className="pod-header">
-                  <span className="pod-number">Pod {pod.podNumber}</span>
-                  <span className="pod-location">
-                    {pod.host.city}, {pod.host.state}
-                  </span>
-                </div>
-                <div className="pod-teams">
-                  {/* Host team (seed 1) */}
-                  <div className="pod-team host">
-                    <span className="pod-seed">1</span>
-                    <div className="pod-team-info">
-                      <span className="pod-team-name">{pod.host.name}</span>
-                      <span className="pod-team-record">{pod.host.record}</span>
-                    </div>
-                    <span className="pod-distance host-badge">HOST</span>
-                  </div>
-                  {/* Other teams (seeds 2-4) */}
-                  {pod.teams.map((team) => (
-                    <div key={team.team_id} className="pod-team">
-                      <span className="pod-seed">{team.seed}</span>
-                      <div className="pod-team-info">
-                        <span className="pod-team-name">{team.name}</span>
-                        <span className="pod-team-record">{team.record}</span>
-                      </div>
-                      <span className="pod-distance">
-                        {team.distance === Infinity ? '?' : `${team.distance} mi`}
-                      </span>
-                    </div>
-                  ))}
-                  {/* Fill empty slots if fewer than 3 visiting teams */}
-                  {pod.teams.length < 3 &&
-                    Array.from({ length: 3 - pod.teams.length }).map((_, i) => (
-                      <div key={`empty-${i}`} className="pod-team empty">
-                        <span className="pod-seed">{pod.teams.length + 2 + i}</span>
-                        <div className="pod-team-info">
-                          <span className="pod-team-name">TBD</span>
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="bracket-projection">
-          <p className="bracket-description">
-            Teams grouped by seed tier. Click a team to see their 4 closest potential host sites.
-          </p>
-          <div className="bracket-grid">
-            {['quad1', 'quad2', 'quad3', 'quad4'].map((quadKey, quadIdx) => (
-              <div key={quadKey} className="bracket-quad">
-                <h3 className="quad-header">#{quadIdx + 1} Seeds</h3>
-                <div className="quad-teams">
-                  {data.bracket[quadKey]?.map((team, teamIdx) => (
-                    <div key={team.team_id} className="bracket-team-wrapper">
-                      <div 
-                        className={`bracket-team ${team.isHost ? 'is-host' : 'expandable'} ${expandedTeams.has(team.team_id) ? 'expanded' : ''}`}
-                        onClick={() => !team.isHost && toggleTeamExpanded(team.team_id)}
-                      >
-                        <span className="seed-number">{quadIdx * 16 + teamIdx + 1}</span>
-                        <div className="bracket-team-info">
-                          <span className="bracket-team-name">{team.name}</span>
-                          <span className="bracket-team-meta">
-                            {team.city && team.state ? `${team.city}, ${team.state}` : team.conference}
-                          </span>
-                        </div>
-                        <div className="bracket-team-right">
-                          <span className="bracket-team-record">{team.record}</span>
-                          {team.isHost ? (
-                            <span className="host-badge">HOST</span>
-                          ) : (
-                            <span className={`expand-icon ${expandedTeams.has(team.team_id) ? 'expanded' : ''}`}>
-                              ▶
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {/* Expandable potential hosts section */}
-                      {expandedTeams.has(team.team_id) && team.potentialHosts && (
-                        <div className="potential-hosts">
-                          <div className="potential-hosts-header">Most Likely Host Sites:</div>
-                          {team.potentialHosts.map((host, idx) => (
-                            <div 
-                              key={host.team_id} 
-                              className={`potential-host ${host.hasConferenceConflict ? 'conf-conflict' : ''}`}
-                            >
-                              <span className="potential-host-rank">{idx + 1}.</span>
-                              <div className="potential-host-info">
-                                <span className="potential-host-name">{host.name}</span>
-                                <span className="potential-host-location">
-                                  {host.city}, {host.state}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTeams.map((team, index) => (
+                <tr
+                  key={team.team_id}
+                  className={team.pr && team.pr <= 64 ? 'in-bracket' : 'bubble'}
+                >
+                  {COLUMNS.map((col) => {
+                    switch (col.key) {
+                      case 'rank':
+                        return <td key={col.key} className="col-rank">{index + 1}</td>;
+                      case 'team':
+                        return (
+                          <td key={col.key} className="col-team">
+                            <div className="team-info">
+                              <TeamLogo logoUrl={team.logo_url} teamName={team.name} />
+                              <div className="team-details">
+                                <span
+                                  className="team-name team-name-clickable"
+                                  onClick={() => onTeamClick && onTeamClick(team)}
+                                >
+                                  {team.name}
+                                  {team.is_conference_champion && <span className="champion-badge" title="Conference Champion (Auto-Bid)">🏆</span>}
                                 </span>
+                                <span className="team-conference">{team.conference || ''}</span>
                               </div>
-                              <span className="potential-host-distance">
-                                {host.distance === Infinity ? '?' : `${host.distance.toLocaleString()} mi`}
-                              </span>
                             </div>
-                          ))}
-                          {team.potentialHosts.some(h => h.hasConferenceConflict) && (
-                            <div className="conf-conflict-note">
-                              * Strikethrough = same conference (unlikely)
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {/* Fill empty slots if fewer than 16 teams */}
-                  {data.bracket[quadKey]?.length < 16 &&
-                    Array.from({ length: 16 - (data.bracket[quadKey]?.length || 0) }).map((_, i) => (
-                      <div key={`empty-${i}`} className="bracket-team-wrapper">
-                        <div className="bracket-team empty">
-                          <span className="seed-number">{(data.bracket[quadKey]?.length || 0) + i + 1}</span>
-                          <div className="bracket-team-info">
-                            <span className="bracket-team-name">TBD</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
+                          </td>
+                        );
+                      case 'area':
+                        return (
+                          <td key={col.key} className="col-area">
+                            <span className={`area-badge area-${team.area?.toLowerCase()}`}>{team.area}</span>
+                          </td>
+                        );
+                      case 'record':
+                        return <td key={col.key} className="col-record">{team.total_wins}-{team.total_losses}</td>;
+                      case 'q1':
+                        return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q1_wins, team.q1_losses, 1)}`}>{formatQuadrant(team.q1_wins, team.q1_losses)}</td>;
+                      case 'q2':
+                        return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q2_wins, team.q2_losses, 2)}`}>{formatQuadrant(team.q2_wins, team.q2_losses)}</td>;
+                      case 'q3':
+                        return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q3_wins, team.q3_losses, 3)}`}>{formatQuadrant(team.q3_wins, team.q3_losses)}</td>;
+                      case 'q4':
+                        return <td key={col.key} className={`col-quadrant ${getQuadrantClass(team.q4_wins, team.q4_losses, 4)}`}>{formatQuadrant(team.q4_wins, team.q4_losses)}</td>;
+                      case 'qwp':
+                        return <td key={col.key} className="col-qwp">{team.qwp % 1 === 0 ? team.qwp.toFixed(0) : team.qwp.toFixed(1)}</td>;
+                      case 'naia_record':
+                        return <td key={col.key} className="col-naia_record">{team.naia_wins}-{team.naia_losses}</td>;
+                      case 'rpi':
+                        return <td key={col.key} className="col-rpi">{team.rpi ? team.rpi.toFixed(3) : '-'}</td>;
+                      case 'rpi_rank':
+                        return <td key={col.key} className="col-rpi_rank">{team.rpi_rank || '-'}</td>;
+                      case 'sos':
+                        return <td key={col.key} className="col-sos">{team.sos ? team.sos.toFixed(3) : '-'}</td>;
+                      case 'sos_rank':
+                        return <td key={col.key} className="col-sos_rank">{team.sos_rank || '-'}</td>;
+                      case 'pcr':
+                        return <td key={col.key} className="col-pcr">{team.pcr || '-'}</td>;
+                      case 'pr':
+                        return <td key={col.key} className="col-pr">{team.pr || '-'}</td>;
+                      case 'total_win_pct':
+                        return <td key={col.key} className="col-total_win_pct">{team.total_win_pct ? team.total_win_pct.toFixed(3) : '-'}</td>;
+                      case 'naia_win_pct':
+                        return <td key={col.key} className="col-naia_win_pct">{team.naia_win_pct ? team.naia_win_pct.toFixed(3) : '-'}</td>;
+                      case 'owp':
+                        return <td key={col.key} className="col-owp">{team.owp ? team.owp.toFixed(3) : '-'}</td>;
+                      case 'oowp':
+                        return <td key={col.key} className="col-oowp">{team.oowp ? team.oowp.toFixed(3) : '-'}</td>;
+                      default:
+                        return <td key={col.key}>-</td>;
+                    }
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </main>
   );
 }
