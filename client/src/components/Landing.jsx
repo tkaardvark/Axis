@@ -285,10 +285,10 @@ export default function Landing() {
             ) : (
               <>
                 <SignInButton mode="modal">
-                  <button className="lp-nav-link">Sign In</button>
+                  <button className="lp-nav-link">Log In</button>
                 </SignInButton>
                 <SignInButton mode="modal">
-                  <button className="lp-nav-cta">Get Started</button>
+                  <button className="lp-nav-cta">Sign Up</button>
                 </SignInButton>
               </>
             )}
