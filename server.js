@@ -59,6 +59,7 @@ app.use(helmet({
         "'self'",
         'https://challenges.cloudflare.com',
         'https://*.clerk.accounts.dev',
+        'https://clerk.axisbasketball.com',
       ],
     },
   },
