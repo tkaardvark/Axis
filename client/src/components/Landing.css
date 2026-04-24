@@ -1721,6 +1721,7 @@
     right: 0;
     z-index: 99;
     padding: 12px var(--lp-gutter);
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
     background: var(--color-bg-primary);
     border-top: 1px solid var(--color-border-primary);
     text-align: center;
