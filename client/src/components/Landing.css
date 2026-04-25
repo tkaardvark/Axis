@@ -1681,7 +1681,7 @@
 
 @media (max-width: 640px) {
   .lp-hero {
-    padding: 3.5rem var(--lp-gutter) 2.5rem;
+    padding: 6rem var(--lp-gutter) 2.5rem;
   }
 
   .lp-hero-h1 {
