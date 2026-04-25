@@ -34,22 +34,30 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Security headers
+// Clerk's modal sign-in requires 'unsafe-inline' + 'unsafe-eval' in script-src,
+// inline event handlers via script-src-attr, and form-action allowing Clerk's
+// domain. See https://clerk.com/docs/security/clerk-csp.
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
+      'default-src': ["'self'"],
       'script-src': [
         "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
         'https://*.clerk.accounts.dev',
         'https://clerk.axisbasketball.com',
         'https://challenges.cloudflare.com',
       ],
+      'script-src-attr': ["'unsafe-inline'"],
       'connect-src': [
         "'self'",
         'https://api.axisbasketball.com',
         'https://*.clerk.accounts.dev',
         'https://clerk.axisbasketball.com',
         'https://challenges.cloudflare.com',
+        'https://clerk-telemetry.com',
       ],
       'img-src': ["'self'", 'data:', 'https://img.clerk.com', "https://cdn.prestosports.com"],
       'worker-src': ["'self'", 'blob:'],
@@ -58,6 +66,11 @@ app.use(helmet({
       'frame-src': [
         "'self'",
         'https://challenges.cloudflare.com',
+        'https://*.clerk.accounts.dev',
+        'https://clerk.axisbasketball.com',
+      ],
+      'form-action': [
+        "'self'",
         'https://*.clerk.accounts.dev',
         'https://clerk.axisbasketball.com',
       ],
