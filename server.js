@@ -33,6 +33,11 @@ const tournamentRoutes = require('./routes/tournament');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Disable Express's default weak ETag — we generate our own strong ETags in
+// the /api middleware below so we can serve 304s for cached league/season
+// data.
+app.set('etag', false);
+
 // Security headers
 // Clerk's modal sign-in requires 'unsafe-inline' + 'unsafe-eval' in script-src,
 // inline event handlers via script-src-attr, and form-action allowing Clerk's
@@ -119,9 +124,43 @@ app.use(clerkMiddlewareFn);
 // Request logging — concise in production, detailed in dev
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Cache API responses for 5 minutes (data refreshes every 4 hours)
+// Cache API responses for 5 minutes (data refreshes every 4 hours).
+// Also generate strong ETags so the browser can revalidate with a small
+// If-None-Match request and we can return 304 Not Modified instead of
+// regenerating + retransmitting the full payload. This is the single biggest
+// win for users switching back-and-forth between leagues/seasons.
+const crypto = require('crypto');
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'public, max-age=300');
+
+  // Only intercept GET (safe + idempotent). Other methods are mutations.
+  if (req.method !== 'GET') return next();
+
+  const originalJson = res.json.bind(res);
+  res.json = function patchedJson(body) {
+    try {
+      // Skip ETag generation on error responses — they shouldn't be cached.
+      if (res.statusCode >= 400) return originalJson(body);
+
+      const payload = JSON.stringify(body);
+      const etag = '"' + crypto.createHash('sha1').update(payload).digest('base64') + '"';
+      res.set('ETag', etag);
+
+      const ifNoneMatch = req.get('If-None-Match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        // Body is unchanged — short-circuit with 304.
+        res.status(304).end();
+        return res;
+      }
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.send(payload);
+      return res;
+    } catch {
+      // If anything goes wrong serializing, fall back to default behavior.
+      return originalJson(body);
+    }
+  };
   next();
 });
 

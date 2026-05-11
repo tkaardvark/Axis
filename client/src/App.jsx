@@ -10,7 +10,7 @@ import ConferenceModal from './components/ConferenceModal';
 import SkeletonLoader from './components/SkeletonLoader';
 import RequireAuth from './components/RequireAuth';
 import Footer from './components/Footer';
-import { API_URL, apiFetch } from './utils/api';
+import { API_URL, apiFetch, apiFetchJson } from './utils/api';
 import './App.css';
 
 // Lazy-load secondary page components for code splitting
@@ -150,25 +150,21 @@ function App() {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [seasonsRes, conferencesRes, monthsRes, lastUpdatedRes, playersExistsRes] = await Promise.all([
-          apiFetch(`${API_URL}/api/seasons?league=${league}`),
-          apiFetch(`${API_URL}/api/conferences?league=${league}&season=${season}`),
-          apiFetch(`${API_URL}/api/months?league=${league}&season=${season}`),
-          apiFetch(`${API_URL}/api/last-updated?league=${league}&season=${season}`),
-          apiFetch(`${API_URL}/api/players/exists?league=${league}&season=${season}`),
+        // apiFetchJson serves cached responses instantly when toggling back to
+        // a previously-loaded league/season, with stale-while-revalidate.
+        const [seasonsData, conferencesData, monthsData, lastUpdatedData, playersExistsData] = await Promise.all([
+          apiFetchJson(`${API_URL}/api/seasons?league=${league}`),
+          apiFetchJson(`${API_URL}/api/conferences?league=${league}&season=${season}`),
+          apiFetchJson(`${API_URL}/api/months?league=${league}&season=${season}`),
+          apiFetchJson(`${API_URL}/api/last-updated?league=${league}&season=${season}`),
+          apiFetchJson(`${API_URL}/api/players/exists?league=${league}&season=${season}`),
         ]);
-
-        const seasonsData = await seasonsRes.json();
-        const conferencesData = await conferencesRes.json();
-        const monthsData = await monthsRes.json();
-        const lastUpdatedData = await lastUpdatedRes.json();
-        const playersExistsData = await playersExistsRes.json();
 
         setSeasons(seasonsData || []);
         setConferences(conferencesData || []);
         setMonths(monthsData || []);
-        setLastUpdated(lastUpdatedData.lastUpdated || null);
-        setHasPlayers(playersExistsData.hasPlayers || false);
+        setLastUpdated(lastUpdatedData?.lastUpdated || null);
+        setHasPlayers(playersExistsData?.hasPlayers || false);
         setError(null);
       } catch (err) {
         console.error('Error fetching metadata:', err);
@@ -205,8 +201,7 @@ function App() {
         }
       }
 
-      const response = await apiFetch(url);
-      const teamsData = await response.json();
+      const teamsData = await apiFetchJson(url);
       setTeams(Array.isArray(teamsData) ? teamsData : []);
     } catch (err) {
       console.error('Error fetching teams:', err);

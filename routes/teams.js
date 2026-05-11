@@ -68,14 +68,20 @@ router.get('/api/teams', async (req, res) => {
 
     const useBoxScore = resolveSource({ league, season, source }) === 'boxscore';
     const statsFunc = useBoxScore ? calculateDynamicStatsFromBoxScores : calculateDynamicStats;
-    const result = await statsFunc(pool, { league, conference, gameType, seasonType, seasonSegment, season });
-    let teams = result.rows;
 
-    // Get total record (all games including non-NAIA, but only completed and non-exhibition)
-    // Exclude national tournament games since this matches bracketcast behavior
-    let totalRecordResult;
-    if (useBoxScore) {
-      totalRecordResult = await pool.query(`
+    // ------------------------------------------------------------------
+    // PERF: Kick off all independent enrichment queries in parallel.
+    // Each query only depends on (league, season, useBoxScore) — none depend
+    // on each other's results. Promises start executing immediately on creation,
+    // so by the time we `await` them below they will already be in flight.
+    // ------------------------------------------------------------------
+    const usePreCalculated = gameType === 'all' && seasonSegment === 'all' && seasonType === 'all';
+
+    const statsPromise = statsFunc(pool, { league, conference, gameType, seasonType, seasonSegment, season });
+    statsPromise.catch(() => {}); // prevent unhandledRejection if a parallel promise throws first
+
+    const totalRecordPromise = useBoxScore
+      ? pool.query(`
         WITH flat AS (
           SELECT t.team_id,
             e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
@@ -95,9 +101,8 @@ router.get('/api/teams', async (req, res) => {
           SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as total_wins,
           SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as total_losses
         FROM flat GROUP BY team_id
-      `, [league, season]);
-    } else {
-      totalRecordResult = await pool.query(`
+      `, [league, season])
+      : pool.query(`
       SELECT
         g.team_id,
         SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as total_wins,
@@ -111,32 +116,10 @@ router.get('/api/teams', async (req, res) => {
         AND g.is_national_tournament = FALSE
       GROUP BY g.team_id
     `, [league, season]);
-    }
 
-    const totalRecords = {};
-    totalRecordResult.rows.forEach(row => {
-      totalRecords[row.team_id] = {
-        total_wins: parseInt(row.total_wins) || 0,
-        total_losses: parseInt(row.total_losses) || 0,
-      };
-    });
-
-    // Add total record to teams
-    teams = teams.map(team => {
-      const tr = totalRecords[team.team_id] || { total_wins: 0, total_losses: 0 };
-      return {
-        ...team,
-        total_wins: tr.total_wins,
-        total_losses: tr.total_losses,
-      };
-    });
-
-    // Add QWI and Power Index when viewing full-season unfiltered data
-    const usePreCalculated = gameType === 'all' && seasonSegment === 'all' && seasonType === 'all';
-    if (usePreCalculated) {
-      try {
-        // Get RPI rankings for quadrant assignment
-        const rpiResult = await pool.query(`
+    // RPI rankings (only needed if pre-calculated path is used)
+    const rpiPromise = usePreCalculated
+      ? pool.query(`
           SELECT t.team_id, tr.rpi
           FROM teams t
           LEFT JOIN team_ratings tr ON t.team_id = tr.team_id
@@ -146,17 +129,14 @@ router.get('/api/teams', async (req, res) => {
             AND t.season = $2
             AND t.is_excluded = FALSE
           ORDER BY tr.rpi DESC NULLS LAST
-        `, [league, season]);
+        `, [league, season])
+      : Promise.resolve({ rows: [] });
 
-        const rpiRanks = {};
-        rpiResult.rows.forEach((row, idx) => {
-          rpiRanks[row.team_id] = row.rpi ? idx + 1 : null;
-        });
-
-        // Get all completed NAIA games for quadrant calculation
-        let gamesResult;
-        if (useBoxScore) {
-          gamesResult = await pool.query(`
+    // Quadrant games (only needed if pre-calculated path is used)
+    const quadrantGamesPromise = !usePreCalculated
+      ? Promise.resolve({ rows: [] })
+      : useBoxScore
+      ? pool.query(`
             SELECT team_id, opponent_id, location, team_score, opponent_score
             FROM (
               SELECT t.team_id, e.home_team_id as opponent_id,
@@ -177,9 +157,8 @@ router.get('/api/teams', async (req, res) => {
                 AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
                 AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
             ) flat
-          `, [league, season]);
-        } else {
-          gamesResult = await pool.query(`
+          `, [league, season])
+      : pool.query(`
             SELECT g.team_id, g.opponent_id, g.location, g.team_score, g.opponent_score
             FROM games g
             JOIN teams t ON g.team_id = t.team_id
@@ -188,7 +167,147 @@ router.get('/api/teams', async (req, res) => {
               AND g.is_naia_game = TRUE
               AND g.is_completed = TRUE
           `, [league, season]);
-        }
+
+    // Conference champions (independent helper)
+    const championsPromise = getConferenceChampions(pool, league, season).catch((err) => {
+      console.error('Error getting conference champions:', err);
+      return new Set();
+    });
+
+    // Conference records
+    const confGamesPromise = useBoxScore
+      ? pool.query(`
+          WITH flat AS (
+            SELECT t.team_id,
+              e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
+            FROM exp_game_box_scores e
+            JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+            WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
+              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            UNION ALL
+            SELECT t.team_id,
+              e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
+            FROM exp_game_box_scores e
+            JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+            WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
+              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+          )
+          SELECT team_id,
+            SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as conf_wins,
+            SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as conf_losses
+          FROM flat GROUP BY team_id
+        `, [league, season])
+      : pool.query(`
+          SELECT g.team_id,
+                 SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as conf_wins,
+                 SUM(CASE WHEN g.team_score < g.opponent_score THEN 1 ELSE 0 END) as conf_losses
+          FROM games g
+          JOIN teams t ON g.team_id = t.team_id
+          WHERE t.league = $1
+            AND g.season = $2
+            AND g.is_conference = TRUE
+            AND g.is_completed = TRUE
+          GROUP BY g.team_id
+        `, [league, season]);
+
+    // Projected conference records — needs both completed + future games
+    const projConfPromise = useBoxScore
+      ? Promise.all([
+          pool.query(`
+            SELECT team_id, opponent_id, team_score, opponent_score,
+                   true as is_completed, location
+            FROM (
+              SELECT e.away_team_id as team_id, e.home_team_id as opponent_id,
+                e.away_score as team_score, e.home_score as opponent_score,
+                CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location
+              FROM exp_game_box_scores e
+              JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
+              WHERE e.season = $2 AND e.is_conference = true
+                AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
+                AND t.league = $1 AND t.is_excluded = false
+                AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+              UNION ALL
+              SELECT e.home_team_id as team_id, e.away_team_id as opponent_id,
+                e.home_score as team_score, e.away_score as opponent_score,
+                CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location
+              FROM exp_game_box_scores e
+              JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
+              WHERE e.season = $2 AND e.is_conference = true
+                AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
+                AND t.league = $1 AND t.is_excluded = false
+                AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
+            ) sub
+          `, [league, season]),
+          pool.query(`
+            SELECT f.team_id, f.opponent_id, NULL as team_score, NULL as opponent_score,
+                   false as is_completed, f.location
+            FROM future_games f
+            JOIN teams t ON f.team_id = t.team_id AND t.season = $2
+            WHERE f.season = $2 AND f.is_conference = true
+              AND f.is_naia_game = true AND f.is_exhibition = false
+              AND t.league = $1 AND t.is_excluded = false
+          `, [league, season]),
+        ]).then(([completedConf, futureConf]) => ({ rows: [...completedConf.rows, ...futureConf.rows] }))
+      : pool.query(`
+          SELECT g.team_id, g.opponent_id, g.team_score, g.opponent_score,
+                 g.is_completed, g.location
+          FROM games g
+          JOIN teams t ON g.team_id = t.team_id AND t.season = $2
+          WHERE g.season = $2 AND g.is_conference = TRUE AND g.is_naia_game = TRUE
+            AND g.is_exhibition = FALSE AND t.league = $1 AND t.is_excluded = FALSE
+        `, [league, season]);
+
+    // 10-0 scoring runs (box score only)
+    const runsPromise = useBoxScore
+      ? getTeamScoringRuns(pool, season, league).catch((err) => {
+          console.error('Error computing scoring runs:', err);
+          return new Map();
+        })
+      : Promise.resolve(new Map());
+
+    // Prevent unhandledRejection warnings on promises whose await may be
+    // skipped if an earlier await throws. Original rejections still surface
+    // when these are awaited.
+    [totalRecordPromise, rpiPromise, quadrantGamesPromise, confGamesPromise, projConfPromise]
+      .forEach((p) => p.catch(() => {}));
+
+    // ------------------------------------------------------------------
+    // Now await the main stats calculation (which we kicked off first).
+    // The other queries are running in parallel in the background.
+    // ------------------------------------------------------------------
+    const result = await statsPromise;
+    let teams = result.rows;
+
+    // Apply total record
+    const totalRecordResult = await totalRecordPromise;
+    const totalRecords = {};
+    totalRecordResult.rows.forEach(row => {
+      totalRecords[row.team_id] = {
+        total_wins: parseInt(row.total_wins) || 0,
+        total_losses: parseInt(row.total_losses) || 0,
+      };
+    });
+
+    // Add total record to teams
+    teams = teams.map(team => {
+      const tr = totalRecords[team.team_id] || { total_wins: 0, total_losses: 0 };
+      return {
+        ...team,
+        total_wins: tr.total_wins,
+        total_losses: tr.total_losses,
+      };
+    });
+
+    // Add QWI and Power Index when viewing full-season unfiltered data
+    if (usePreCalculated) {
+      try {
+        // Awaits pre-launched RPI + quadrant games queries (running in parallel)
+        const [rpiResult, gamesResult] = await Promise.all([rpiPromise, quadrantGamesPromise]);
+
+        const rpiRanks = {};
+        rpiResult.rows.forEach((row, idx) => {
+          rpiRanks[row.team_id] = row.rpi ? idx + 1 : null;
+        });
 
         // Tally quadrant records per team
         const quadrantRecords = {};
@@ -249,9 +368,9 @@ router.get('/api/teams', async (req, res) => {
       }
     }
 
-    // Add conference champion flag
+    // Add conference champion flag (already running in parallel)
     try {
-      const conferenceChampions = await getConferenceChampions(pool, league, season);
+      const conferenceChampions = await championsPromise;
       teams = teams.map(team => ({
         ...team,
         is_conference_champion: conferenceChampions.has(team.team_id),
@@ -261,45 +380,9 @@ router.get('/api/teams', async (req, res) => {
       // Continue without champion flags
     }
 
-    // Add conference records
+    // Add conference records (already running in parallel)
     try {
-      let confGamesResult;
-      if (useBoxScore) {
-        confGamesResult = await pool.query(`
-          WITH flat AS (
-            SELECT t.team_id,
-              e.away_score as team_score, e.home_score as opponent_score, e.forfeit_team_id
-            FROM exp_game_box_scores e
-            JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
-            WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
-              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
-            UNION ALL
-            SELECT t.team_id,
-              e.home_score as team_score, e.away_score as opponent_score, e.forfeit_team_id
-            FROM exp_game_box_scores e
-            JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
-            WHERE t.league = $1 AND e.season = $2 AND e.is_conference = true
-              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
-          )
-          SELECT team_id,
-            SUM(CASE WHEN (forfeit_team_id IS NOT NULL AND forfeit_team_id != team_id) OR (forfeit_team_id IS NULL AND team_score > opponent_score) THEN 1 ELSE 0 END) as conf_wins,
-            SUM(CASE WHEN forfeit_team_id = team_id OR (forfeit_team_id IS NULL AND team_score < opponent_score) THEN 1 ELSE 0 END) as conf_losses
-          FROM flat GROUP BY team_id
-        `, [league, season]);
-      } else {
-        confGamesResult = await pool.query(`
-          SELECT g.team_id,
-                 SUM(CASE WHEN g.team_score > g.opponent_score THEN 1 ELSE 0 END) as conf_wins,
-                 SUM(CASE WHEN g.team_score < g.opponent_score THEN 1 ELSE 0 END) as conf_losses
-          FROM games g
-          JOIN teams t ON g.team_id = t.team_id
-          WHERE t.league = $1
-            AND g.season = $2
-            AND g.is_conference = TRUE
-            AND g.is_completed = TRUE
-          GROUP BY g.team_id
-        `, [league, season]);
-      }
+      const confGamesResult = await confGamesPromise;
 
       const confRecords = {};
       confGamesResult.rows.forEach(row => {
@@ -331,56 +414,8 @@ router.get('/api/teams', async (req, res) => {
         };
       });
 
-      // Get all conference games (completed and future)
-      let allConfGames;
-      if (useBoxScore) {
-        const completedConf = await pool.query(`
-          SELECT team_id, opponent_id, team_score, opponent_score,
-                 true as is_completed, location
-          FROM (
-            SELECT e.away_team_id as team_id, e.home_team_id as opponent_id,
-              e.away_score as team_score, e.home_score as opponent_score,
-              CASE WHEN e.is_neutral THEN 'neutral' ELSE 'away' END as location
-            FROM exp_game_box_scores e
-            JOIN teams t ON t.team_id = e.away_team_id AND t.season = e.season
-            WHERE e.season = $2 AND e.is_conference = true
-              AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
-              AND t.league = $1 AND t.is_excluded = false
-              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
-            UNION ALL
-            SELECT e.home_team_id as team_id, e.away_team_id as opponent_id,
-              e.home_score as team_score, e.away_score as opponent_score,
-              CASE WHEN e.is_neutral THEN 'neutral' ELSE 'home' END as location
-            FROM exp_game_box_scores e
-            JOIN teams t ON t.team_id = e.home_team_id AND t.season = e.season
-            WHERE e.season = $2 AND e.is_conference = true
-              AND COALESCE(e.is_naia_game, false) = true AND e.is_exhibition = false
-              AND t.league = $1 AND t.is_excluded = false
-              AND e.away_score IS NOT NULL AND e.home_score IS NOT NULL
-          ) sub
-        `, [league, season]);
-
-        const futureConf = await pool.query(`
-          SELECT f.team_id, f.opponent_id, NULL as team_score, NULL as opponent_score,
-                 false as is_completed, f.location
-          FROM future_games f
-          JOIN teams t ON f.team_id = t.team_id AND t.season = $2
-          WHERE f.season = $2 AND f.is_conference = true
-            AND f.is_naia_game = true AND f.is_exhibition = false
-            AND t.league = $1 AND t.is_excluded = false
-        `, [league, season]);
-
-        allConfGames = { rows: [...completedConf.rows, ...futureConf.rows] };
-      } else {
-        allConfGames = await pool.query(`
-        SELECT g.team_id, g.opponent_id, g.team_score, g.opponent_score,
-               g.is_completed, g.location
-        FROM games g
-        JOIN teams t ON g.team_id = t.team_id AND t.season = $2
-        WHERE g.season = $2 AND g.is_conference = TRUE AND g.is_naia_game = TRUE
-          AND g.is_exhibition = FALSE AND t.league = $1 AND t.is_excluded = FALSE
-      `, [league, season]);
-      }
+      // Awaits pre-launched projected conf games (running in parallel)
+      const allConfGames = await projConfPromise;
 
       const projRecords = {};
       allConfGames.rows.forEach(g => {
@@ -414,7 +449,8 @@ router.get('/api/teams', async (req, res) => {
     // Add 10-0 scoring runs from PBP data (box score source only)
     if (useBoxScore) {
       try {
-        const runsMap = await getTeamScoringRuns(pool, season, league);
+        // Awaits pre-launched scoring runs (running in parallel)
+        const runsMap = await runsPromise;
         teams = teams.map(team => {
           const r = runsMap.get(team.team_id);
           if (!r || r.games === 0) {
