@@ -275,9 +275,11 @@ router.get('/api/games/:gameId/boxscore', requireSignIn, async (req, res) => {
         ast: p.ast, stl: p.stl, blk: p.blk, to: p.turnovers, pf: p.pf, pts: p.pts,
       }));
 
-      // Build score progression array
+      // Build score progression array. Initial clock is the start of period 1:
+      // 20:00 for men's halves, 10:00 for women's quarters.
+      const startClock = g.league === 'womens' ? '10:00' : '20:00';
       const scoreProgression = [
-        { period: 1, clock: '20:00', sequence: 0, awayScore: 0, homeScore: 0 },
+        { period: 1, clock: startClock, sequence: 0, awayScore: 0, homeScore: 0 },
       ];
       for (const play of pbpResult.rows) {
         scoreProgression.push({

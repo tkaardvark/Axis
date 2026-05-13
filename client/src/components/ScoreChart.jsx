@@ -13,47 +13,67 @@ import './ScoreChart.css';
 
 /**
  * Convert period + game_clock ("MM:SS") to elapsed minutes.
- * Each regulation period is 20 minutes (college basketball halves).
+ * Men's basketball: 2 halves of 20 minutes each (regulation = 40 min).
+ * Women's basketball: 4 quarters of 10 minutes each (regulation = 40 min).
  * Overtime periods are 5 minutes each.
  */
-function toElapsedMinutes(period, clock) {
-  if (!clock) return (period - 1) * 20;
-  const [min, sec] = clock.split(':').map(Number);
-  const periodLength = period <= 2 ? 20 : 5;
-  const elapsed = periodLength - min - sec / 60;
-  if (period <= 2) {
-    return (period - 1) * 20 + elapsed;
+function toElapsedMinutes(period, clock, league) {
+  const isWomens = league === 'womens';
+  const regPeriods = isWomens ? 4 : 2;
+  const regPeriodLen = isWomens ? 10 : 20;
+  const regulationMin = regPeriods * regPeriodLen; // always 40
+
+  if (!clock) {
+    if (period <= regPeriods) return (period - 1) * regPeriodLen;
+    return regulationMin + (period - regPeriods - 1) * 5;
   }
-  // Overtime: periods 3, 4, 5... map to OT1, OT2, OT3...
-  return 40 + (period - 3) * 5 + elapsed;
+  const [min, sec] = clock.split(':').map(Number);
+  const periodLength = period <= regPeriods ? regPeriodLen : 5;
+  const elapsed = periodLength - min - sec / 60;
+  if (period <= regPeriods) {
+    return (period - 1) * regPeriodLen + elapsed;
+  }
+  return regulationMin + (period - regPeriods - 1) * 5 + elapsed;
 }
 
-function ScoreChart({ scoreProgression, awayName, homeName }) {
+function ScoreChart({ scoreProgression, awayName, homeName, league }) {
+  const isWomens = league === 'womens';
+  const regPeriods = isWomens ? 4 : 2;
+  const regPeriodLen = isWomens ? 10 : 20;
+  const regulationMin = regPeriods * regPeriodLen; // 40
+
   const chartData = useMemo(() => {
     if (!scoreProgression || scoreProgression.length < 2) return [];
 
     return scoreProgression.map((p) => ({
-      elapsed: Math.round(toElapsedMinutes(p.period, p.clock) * 100) / 100,
+      elapsed: Math.round(toElapsedMinutes(p.period, p.clock, league) * 100) / 100,
       away: p.awayScore,
       home: p.homeScore,
       period: p.period,
       clock: p.clock,
     }));
-  }, [scoreProgression]);
+  }, [scoreProgression, league]);
 
   if (chartData.length < 2) return null;
 
   const maxPeriod = Math.max(...chartData.map((d) => d.period));
-  const totalMinutes = maxPeriod <= 2 ? 40 : 40 + (maxPeriod - 2) * 5;
+  const totalMinutes = maxPeriod <= regPeriods
+    ? regulationMin
+    : regulationMin + (maxPeriod - regPeriods) * 5;
   const maxScore = Math.max(...chartData.map((d) => Math.max(d.away, d.home)));
+
+  const periodOrdinal = (n) => {
+    if (isWomens) return `Q${n}`;
+    return n === 1 ? '1st Half' : '2nd Half';
+  };
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const periodLabel =
-        data.period <= 2
-          ? `${data.period === 1 ? '1st' : '2nd'} Half`
-          : `OT${data.period - 2}`;
+        data.period <= regPeriods
+          ? periodOrdinal(data.period)
+          : `OT${data.period - regPeriods}`;
       return (
         <div className="score-chart-tooltip">
           <p className="tooltip-time">
@@ -75,16 +95,24 @@ function ScoreChart({ scoreProgression, awayName, homeName }) {
 
   const formatTick = (val) => {
     if (val === 0) return '0';
-    if (val === 20) return 'Half';
-    if (val === 40) return '40';
+    if (isWomens) {
+      // Mark each quarter boundary
+      if (val === 10) return 'Q1';
+      if (val === 20) return 'Half';
+      if (val === 30) return 'Q3';
+      if (val === 40) return '40';
+    } else {
+      if (val === 20) return 'Half';
+      if (val === 40) return '40';
+    }
     if (val > 40 && val % 5 === 0) return `OT${(val - 40) / 5}`;
     return `${val}`;
   };
 
-  // Build ticks: 0, 10, 20, 30, 40, then OT periods
-  const ticks = [0, 10, 20, 30, 40];
-  for (let p = 3; p <= maxPeriod; p++) {
-    ticks.push(40 + (p - 2) * 5);
+  // Build ticks: regulation markers + each OT
+  const ticks = isWomens ? [0, 10, 20, 30, 40] : [0, 10, 20, 30, 40];
+  for (let p = regPeriods + 1; p <= maxPeriod; p++) {
+    ticks.push(regulationMin + (p - regPeriods) * 5);
   }
 
   return (
@@ -146,7 +174,7 @@ function ScoreChart({ scoreProgression, awayName, homeName }) {
               strokeDasharray="4 4"
               strokeOpacity={0.5}
             />
-            {maxPeriod > 2 && (
+            {maxPeriod > regPeriods && (
               <ReferenceLine
                 x={40}
                 stroke="var(--color-text-tertiary)"

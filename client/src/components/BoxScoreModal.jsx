@@ -239,11 +239,23 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
                 scoreProgression={data.score_progression}
                 awayName={data.team.name}
                 homeName={data.opponent.name}
+                league={data.league}
               />
             )}
 
             {/* Linescore */}
-            {data.period_scores && (
+            {data.period_scores && (() => {
+              // Women's basketball plays 4 quarters; men's plays 2 halves.
+              // Any period beyond regulation is overtime.
+              const regPeriods = data.league === 'womens' ? 4 : 2;
+              const periodLabel = (i) => {
+                if (i < regPeriods) {
+                  return data.league === 'womens' ? `Q${i + 1}` : `${i + 1}H`;
+                }
+                const otNum = i - regPeriods + 1;
+                return regPeriods === 2 && i === regPeriods ? 'OT' : `OT${otNum}`;
+              };
+              return (
               <div className="boxscore-linescore">
                 <table className="linescore-table">
                   <thead>
@@ -251,7 +263,7 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
                       <th className="linescore-team-col"></th>
                       {(data.period_scores.away || []).map((_, i) => (
                         <th key={i} className="linescore-period-col">
-                          {i < 2 ? `${i + 1}H` : `OT${i - 1}`}
+                          {periodLabel(i)}
                         </th>
                       ))}
                       <th className="linescore-total-col">T</th>
@@ -275,7 +287,8 @@ function BoxScoreModal({ gameId, season, onClose, sourceParam = '' }) {
                   </tbody>
                 </table>
               </div>
-            )}
+              );
+            })()}
 
             <div className="boxscore-body">
               <table className="boxscore-table">
