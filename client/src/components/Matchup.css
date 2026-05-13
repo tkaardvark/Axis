@@ -131,14 +131,6 @@
   margin: 0;
 }
 
-.section-subtitle {
-  display: block;
-  font-family: var(--font-body);
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  margin-top: 2px;
-}
-
 /* Prediction Header */
 .matchup-prediction {
   display: flex;
