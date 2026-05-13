@@ -1291,6 +1291,36 @@ router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
       return res.json({ lineupStats: [], gamesAnalyzed: 0 });
     }
 
+    // Per-league period structure (seconds)
+    const isWomens = league === 'womens';
+    const regPeriods = isWomens ? 4 : 2;
+    const regPeriodSec = isWomens ? 600 : 1200; // 10 or 20 minutes
+    const otPeriodSec = 300; // 5 minutes
+    const regulationSec = regPeriods * regPeriodSec; // 2400 (40 min)
+
+    // Convert (period, "MM:SS") to elapsed seconds from tipoff.
+    const elapsedSeconds = (period, clock) => {
+      if (!period) return 0;
+      const priorPeriods = period - 1;
+      const priorSec = priorPeriods <= regPeriods
+        ? priorPeriods * regPeriodSec
+        : regulationSec + (priorPeriods - regPeriods) * otPeriodSec;
+      if (!clock) return priorSec;
+      const [m, s] = String(clock).split(':').map(Number);
+      const remaining = (m || 0) * 60 + (s || 0);
+      const periodLen = period <= regPeriods ? regPeriodSec : otPeriodSec;
+      return priorSec + Math.max(0, periodLen - remaining);
+    };
+
+    // Fetch team pace (for possession estimation). Fallback to 70.
+    const paceRes = await pool.query(`
+      SELECT pace FROM team_ratings
+      WHERE team_id = $1 AND season = $2
+      ORDER BY date_calculated DESC
+      LIMIT 1
+    `, [teamId, season]);
+    const teamPace = parseFloat(paceRes.rows[0]?.pace) || 70;
+
     // Get all games for this team
     const gamesResult = await pool.query(`
       SELECT id as game_id, home_team_name, away_team_name, home_score, away_score
@@ -1341,36 +1371,31 @@ router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
       startersByGame[row.game_box_score_id].push(row);
     }
 
+    // Normalize player name for consistent matching (handles "First Last" vs "LAST,FIRST")
+    const normalizeName = (name) => {
+      if (!name) return '';
+      const parts = name.toLowerCase().replace(/[,.'"-]/g, ' ').trim().split(/\s+/).filter(Boolean);
+      return parts.sort().join(' ');
+    };
+
+    // Format name for display (Title Case)
+    const formatDisplayName = (name) => {
+      if (!name) return '';
+      if (name.includes(',')) {
+        const [last, first] = name.split(',').map(s => s.trim());
+        return `${first} ${last}`.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+      return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    };
+
     // Process each game
     for (const game of gamesResult.rows) {
       const isHome = game.home_team_name === teamName;
-      const teamScore = isHome ? game.home_score : game.away_score;
-      const oppScore = isHome ? game.away_score : game.home_score;
-      
+
       const pbpRows = pbpByGame[game.game_id] || [];
       const starterRows = startersByGame[game.game_id] || [];
 
       if (!pbpRows.length || starterRows.length !== 5) continue;
-
-      // Normalize player name for consistent matching (handles "First Last" vs "LAST,FIRST")
-      const normalizeName = (name) => {
-        if (!name) return '';
-        // Convert to lowercase, remove punctuation, sort parts alphabetically for matching
-        const parts = name.toLowerCase().replace(/[,.'"-]/g, ' ').trim().split(/\s+/).filter(Boolean);
-        return parts.sort().join(' ');
-      };
-
-      // Format name for display (Title Case)
-      const formatDisplayName = (name) => {
-        if (!name) return '';
-        // Handle "LAST,FIRST" format
-        if (name.includes(',')) {
-          const [last, first] = name.split(',').map(s => s.trim());
-          return `${first} ${last}`.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-        }
-        // Already "First Last" format
-        return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-      };
 
       // Track current lineup on court
       const onCourt = new Map(); // normalizedName -> displayName
@@ -1382,89 +1407,125 @@ router.get('/api/teams/:teamId/lineup-stats', async (req, res) => {
         entryOrder.push(normalized);
       });
 
-      let lastTeamScore = 0;
-      let lastOppScore = 0;
+      // Build a stable key + display list for the *current* 5-man lineup
+      const currentLineupKey = () => {
+        if (onCourt.size < 5) return null;
+        const entries = Array.from(onCourt.entries()).slice(0, 5)
+          .sort((a, b) => a[0].localeCompare(b[0]));
+        return {
+          key: entries.map(([norm]) => norm).join('|'),
+          names: entries.map(([, display]) => display),
+        };
+      };
+
+      // Open the first stint at tipoff
+      let stintInfo = currentLineupKey();
+      let stintStartSec = 0;
+      let stintStartTeamScore = 0;
+      let stintStartOppScore = 0;
+
+      const closeStint = (endSec, endTeamScore, endOppScore) => {
+        if (!stintInfo) return;
+        const dur = endSec - stintStartSec;
+        if (dur <= 0) return;
+        const ptsFor = endTeamScore - stintStartTeamScore;
+        const ptsAgainst = endOppScore - stintStartOppScore;
+        let entry = lineupMap[stintInfo.key];
+        if (!entry) {
+          entry = lineupMap[stintInfo.key] = {
+            players: stintInfo.names,
+            pointsScored: 0,
+            pointsAllowed: 0,
+            seconds: 0,
+          };
+        }
+        entry.seconds += dur;
+        entry.pointsScored += Math.max(0, ptsFor);
+        entry.pointsAllowed += Math.max(0, ptsAgainst);
+      };
+
+      let curElapsed = 0;
+      let curTeamScore = 0;
+      let curOppScore = 0;
 
       // Process each play
       for (const play of pbpRows) {
+        curElapsed = elapsedSeconds(play.period, play.game_clock);
+        if (play.away_score !== null && play.home_score !== null) {
+          curTeamScore = isHome ? play.home_score : play.away_score;
+          curOppScore = isHome ? play.away_score : play.home_score;
+        }
+
         // Handle substitutions - only "enters" events exist in the data
         if (play.action_type === 'substitution' && play.team_name === teamName) {
           const text = (play.action_text || '').toLowerCase();
           const playerName = play.player_name;
-          
+
           if (text.includes('enters') && playerName) {
             const normalized = normalizeName(playerName);
             const display = formatDisplayName(playerName);
-            
-            // If player not already on court, add them
+
             if (!onCourt.has(normalized)) {
+              // Close current stint at this point
+              closeStint(curElapsed, curTeamScore, curOppScore);
+
               // If we already have 5 players, remove the oldest non-starter
               if (onCourt.size >= 5 && entryOrder.length > 0) {
-                // Remove the first player in entry order (oldest sub)
                 const playerToRemove = entryOrder.shift();
                 onCourt.delete(playerToRemove);
               }
               onCourt.set(normalized, display);
               entryOrder.push(normalized);
-            }
-          }
-        }
 
-        // Handle scoring plays - attribute to current lineup
-        if (play.is_scoring_play && play.away_score !== null && play.home_score !== null) {
-          const currentTeamScore = isHome ? play.home_score : play.away_score;
-          const currentOppScore = isHome ? play.away_score : play.home_score;
-          
-          const pointsScored = currentTeamScore - lastTeamScore;
-          const pointsAllowed = currentOppScore - lastOppScore;
-          
-          if (pointsScored !== 0 || pointsAllowed !== 0) {
-            // Get current 5-man lineup
-            const lineup = Array.from(onCourt.entries()).slice(0, 5);
-            if (lineup.length === 5) {
-              // Use normalized names for key, display names for output
-              const sortedEntries = lineup.sort((a, b) => a[0].localeCompare(b[0]));
-              const lineupKey = sortedEntries.map(([norm]) => norm).join('|');
-              const displayNames = sortedEntries.map(([, display]) => display);
-              
-              if (!lineupMap[lineupKey]) {
-                lineupMap[lineupKey] = {
-                  players: displayNames,
-                  pointsScored: 0,
-                  pointsAllowed: 0,
-                  possessions: 0 // rough estimate based on scoring plays
-                };
-              }
-              
-              lineupMap[lineupKey].pointsScored += Math.max(0, pointsScored);
-              lineupMap[lineupKey].pointsAllowed += Math.max(0, pointsAllowed);
-              lineupMap[lineupKey].possessions++;
+              // Open the next stint
+              stintInfo = currentLineupKey();
+              stintStartSec = curElapsed;
+              stintStartTeamScore = curTeamScore;
+              stintStartOppScore = curOppScore;
             }
           }
-          
-          lastTeamScore = currentTeamScore;
-          lastOppScore = currentOppScore;
         }
       }
+
+      // Close the final stint at end of game (use last seen elapsed/score).
+      // Pad to at least regulation if needed.
+      const finalElapsed = Math.max(curElapsed, regulationSec);
+      const finalTeamScore = isHome ? game.home_score : game.away_score;
+      const finalOppScore = isHome ? game.away_score : game.home_score;
+      closeStint(finalElapsed, finalTeamScore ?? curTeamScore, finalOppScore ?? curOppScore);
     }
 
-    // Convert to array and calculate +/-
+    // Convert to array and calculate per-100 metrics using floor-time × team pace
+    const SECONDS_PER_GAME = regulationSec; // 40 min regulation
     const lineupStats = Object.values(lineupMap)
-      .map(lineup => ({
-        players: lineup.players,
-        pointsScored: lineup.pointsScored,
-        pointsAllowed: lineup.pointsAllowed,
-        plusMinus: lineup.pointsScored - lineup.pointsAllowed,
-        possessions: lineup.possessions,
-        offRating: lineup.possessions > 0 ? (lineup.pointsScored / lineup.possessions * 100).toFixed(1) : null,
-        defRating: lineup.possessions > 0 ? (lineup.pointsAllowed / lineup.possessions * 100).toFixed(1) : null
-      }))
-      .filter(l => l.possessions >= 2) // Include lineups with at least 2 scoring events
-      .sort((a, b) => b.plusMinus - a.plusMinus);
+      .map(lineup => {
+        const minutesPlayed = lineup.seconds / 60;
+        // Estimated possessions: (fraction of 40-min game) * team pace
+        const possessions = (lineup.seconds / SECONDS_PER_GAME) * teamPace;
+        const plusMinus = lineup.pointsScored - lineup.pointsAllowed;
+        const offRating = possessions > 0 ? (lineup.pointsScored / possessions) * 100 : null;
+        const defRating = possessions > 0 ? (lineup.pointsAllowed / possessions) * 100 : null;
+        const netPer100 = possessions > 0 ? (plusMinus / possessions) * 100 : 0;
+        return {
+          players: lineup.players,
+          pointsScored: lineup.pointsScored,
+          pointsAllowed: lineup.pointsAllowed,
+          plusMinus,
+          minutesPlayed: Math.round(minutesPlayed * 10) / 10,
+          possessions: Math.round(possessions),
+          netPer100: Math.round(netPer100 * 10) / 10,
+          offRating: offRating !== null ? Math.round(offRating * 10) / 10 : null,
+          defRating: defRating !== null ? Math.round(defRating * 10) / 10 : null,
+        };
+      })
+      // Require at least ~2 minutes of floor time to filter out noise
+      .filter(l => l.minutesPlayed >= 2)
+      .sort((a, b) => b.netPer100 - a.netPer100);
 
-    res.json({ 
-      lineupStats, // Return all lineups for sortable table
-      gamesAnalyzed: gamesResult.rows.length 
+    res.json({
+      lineupStats,
+      gamesAnalyzed: gamesResult.rows.length,
+      teamPace: Math.round(teamPace * 10) / 10,
     });
   } catch (err) {
     console.error('Error fetching lineup stats:', err);

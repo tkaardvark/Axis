@@ -298,13 +298,16 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
     return sorted;
   }, [lineups, lineupSort]);
 
-  // Sorted 5-man lineup stats with net rating computed
+  // Sorted 5-man lineup stats
   const sortedLineupStats = useMemo(() => {
     if (!lineupStats.length) return [];
-    // Compute net rating (+/- per 100 possessions) for each lineup
+    // netPer100 is computed server-side from floor-time × team pace.
+    // Fall back to client-side calc for backwards compat with any cached responses.
     const enriched = lineupStats.map(l => ({
       ...l,
-      netPer100: l.possessions > 0 ? (l.plusMinus / l.possessions) * 100 : 0,
+      netPer100: typeof l.netPer100 === 'number'
+        ? l.netPer100
+        : (l.possessions > 0 ? (l.plusMinus / l.possessions) * 100 : 0),
     }));
     const sorted = enriched.sort((a, b) => {
       let aVal, bVal;
@@ -312,6 +315,7 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
         case 'pointsScored': aVal = a.pointsScored; bVal = b.pointsScored; break;
         case 'pointsAllowed': aVal = a.pointsAllowed; bVal = b.pointsAllowed; break;
         case 'possessions': aVal = a.possessions; bVal = b.possessions; break;
+        case 'minutesPlayed': aVal = a.minutesPlayed || 0; bVal = b.minutesPlayed || 0; break;
         case 'netPer100': aVal = a.netPer100; bVal = b.netPer100; break;
         default: aVal = a.plusMinus; bVal = b.plusMinus;
       }
@@ -822,7 +826,7 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
             <section className="scout-section">
               <div className="scout-section-header">
                 <h3>5-Man Lineup +/-</h3>
-                <span className="section-subtitle">Based on play-by-play substitution tracking</span>
+                <span className="section-subtitle">Per-100 estimates based on floor time × team pace</span>
               </div>
               
               <div className="scout-lineups-wrapper">
@@ -841,6 +845,9 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
                       <th className="col-pts sortable-header" onClick={() => toggleLineupStatsSort('pointsAllowed')}>
                         OPP {lineupStatsSort.column === 'pointsAllowed' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
                       </th>
+                      <th className="col-poss sortable-header" onClick={() => toggleLineupStatsSort('minutesPlayed')}>
+                        MIN {lineupStatsSort.column === 'minutesPlayed' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
+                      </th>
                       <th className="col-poss sortable-header" onClick={() => toggleLineupStatsSort('possessions')}>
                         POSS {lineupStatsSort.column === 'possessions' && <span className="sort-arrow">{lineupStatsSort.direction === 'desc' ? '▼' : '▲'}</span>}
                       </th>
@@ -858,6 +865,7 @@ function Scout({ league, season, teams = [], conferences = [], sourceParam = '' 
                         </td>
                         <td className="col-pts">{lineup.pointsScored}</td>
                         <td className="col-pts">{lineup.pointsAllowed}</td>
+                        <td className="col-poss">{lineup.minutesPlayed != null ? lineup.minutesPlayed.toFixed(1) : '—'}</td>
                         <td className="col-poss">{lineup.possessions}</td>
                         <td className="col-lineup">
                           {lineup.players.map((player, pIdx) => (
