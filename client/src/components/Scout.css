@@ -2,16 +2,6 @@
   padding-bottom: 24px;
 }
 
-.scout-page .page-header {
-  padding: 24px 24px 0;
-}
-
-.scout-page .page-subtitle {
-  color: var(--color-text-tertiary);
-  font-size: 14px;
-  margin-top: 4px;
-}
-
 /* Team Filters - matches FilterBar */
 .scout-filters {
   display: flex;
@@ -995,10 +985,6 @@
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
-  .scout-page .page-header {
-    padding: 16px 16px 0;
-  }
-
   .scout-filters {
     padding: 12px 16px;
     gap: 12px;

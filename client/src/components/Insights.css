@@ -2,16 +2,6 @@
   padding-bottom: 24px;
 }
 
-.insights-page .page-header {
-  padding: 24px 24px 0;
-}
-
-.insights-page .page-subtitle {
-  font-size: 13px;
-  color: var(--color-text-tertiary);
-  margin: 4px 0 0;
-}
-
 /* Filter dropdown */
 .insights-filter {
   flex-shrink: 0;
@@ -97,10 +87,6 @@
 
 /* Tablet */
 @media (max-width: 768px) {
-  .insights-page .page-header {
-    padding: 20px 16px 0;
-  }
-
   .insights-controls {
     padding: 16px 16px 0;
     flex-wrap: wrap;
@@ -129,10 +115,6 @@
 
 /* Mobile */
 @media (max-width: 600px) {
-  .insights-page .page-header {
-    padding: 16px 12px 0;
-  }
-
   .insights-controls {
     padding: 0 12px 12px;
     flex-direction: column;
@@ -187,10 +169,6 @@
 
 /* Small mobile */
 @media (max-width: 480px) {
-  .insights-page .page-header {
-    padding: 12px 8px 0;
-  }
-
   .insights-controls {
     padding: 0 8px 10px;
   }

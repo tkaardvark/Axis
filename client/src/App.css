@@ -44,7 +44,17 @@
   font-size: 24px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin: 0 0 0 0;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--color-text-tertiary);
+  margin: 4px 0 0;
 }
 
 /* ===== Shared Page Tabs (underline style) ===== */
@@ -113,6 +123,10 @@
     font-size: 22px;
   }
 
+  .page-subtitle {
+    font-size: 13px;
+  }
+
   .page-tabs {
     padding: 12px 16px 0;
     overflow-x: auto;
@@ -139,6 +153,10 @@
 
   .page-header h1 {
     font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 12px;
   }
 
   .last-updated {

@@ -2,16 +2,6 @@
   padding-bottom: 24px;
 }
 
-.bracketcast-page .page-header {
-  padding: 24px 24px 0;
-}
-
-.page-subtitle {
-  color: var(--color-text-tertiary);
-  font-size: 14px;
-  margin-top: 4px;
-}
-
 .as-of-date {
   color: var(--color-text-tertiary);
   font-size: 13px;
@@ -714,14 +704,6 @@
 
 /* Mobile styles */
 @media (max-width: 600px) {
-  .bracketcast-page .page-header {
-    padding: 16px 12px 0;
-  }
-
-  .page-subtitle {
-    font-size: 13px;
-  }
-
   .view-toggle {
     width: 100%;
     padding: 12px;

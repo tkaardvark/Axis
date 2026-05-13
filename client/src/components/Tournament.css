@@ -2,10 +2,6 @@
   padding-bottom: 24px;
 }
 
-.tournament-page .page-header {
-  padding: 24px 24px 0;
-}
-
 .tournament-dates {
   color: var(--color-text-tertiary);
   font-size: 13px;
@@ -517,10 +513,6 @@
 }
 
 @media (max-width: 768px) {
-  .tournament-page .page-header {
-    padding: 16px 12px 0;
-  }
-
   .tournament-controls {
     padding: 12px;
   }

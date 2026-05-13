@@ -2,16 +2,6 @@
   padding-bottom: 24px;
 }
 
-.conferences-page .page-header {
-  padding: 24px 24px 0;
-}
-
-.conferences-page .page-subtitle {
-  color: var(--color-text-tertiary);
-  font-size: 14px;
-  margin-top: 4px;
-}
-
 /* Conference Selector */
 .conf-selector {
   display: flex;
@@ -801,10 +791,6 @@
 
 /* Tablet */
 @media (max-width: 768px) {
-  .conferences-page .page-header {
-    padding: 16px 16px 0;
-  }
-
   .conf-tabs {
     padding: 16px 16px 0;
   }
@@ -846,10 +832,6 @@
 
 /* Mobile */
 @media (max-width: 600px) {
-  .conferences-page .page-header {
-    padding: 12px 12px 0;
-  }
-
   .conf-tabs {
     padding: 12px 12px 0;
   }
