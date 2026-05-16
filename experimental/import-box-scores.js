@@ -34,6 +34,7 @@ const {
 } = require('./scrape-scoreboard');
 const { parseBoxScore } = require('./parse-box-score');
 const { refreshTeamStats } = require('../utils/refreshTeamStats');
+const { classifyNationalTournament } = require('../utils/tournamentClassifier');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -113,6 +114,22 @@ async function insertBoxScore(parsed) {
         [game.home.name, game.season, game.league]
       );
       if (r.rows.length > 0) game.home.id = r.rows[0].team_id;
+    }
+
+    // Authoritative override for is_national_tournament using the official bracket.
+    // Presto Sports' postseason tagging is unreliable (esp. for womens — many real
+    // tournament games are unflagged, and concurrent NCCAA games are mis-flagged).
+    // The bracket is the source of truth; the date-based derivation in processBoxScore
+    // is only a hint that gets overridden whenever we have a bracket for the season.
+    const bracketVerdict = classifyNationalTournament({
+      league: game.league,
+      season: game.season,
+      gameDate: game.gameDate,
+      awayTeamId: game.away.id,
+      homeTeamId: game.home.id,
+    });
+    if (bracketVerdict !== null) {
+      game.isNationalTournament = bracketVerdict;
     }
 
     const awayTotals = game.away.totals || {};

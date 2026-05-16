@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool, DEFAULT_SEASON } = require('../db/pool');
-const { TOURNAMENT_BRACKET_2026 } = require('../config/tournament-bracket-2026');
+const { getBracket } = require('../config/tournament-bracket-2026');
 const { resolveSource } = require('../utils/dataSource');
 const { getQuadrant } = require('../utils/quadrant');
 const { requireSignIn } = require('../utils/authMiddleware');
@@ -11,9 +11,9 @@ const { haversineDistance } = require('../utils/geometry');
 router.get('/api/tournament', requireSignIn, async (req, res) => {
   try {
     const { league = 'mens', season = DEFAULT_SEASON, source } = req.query;
-    const bracket = TOURNAMENT_BRACKET_2026;
+    const bracket = getBracket({ league, season });
 
-    if (league !== bracket.league || season !== bracket.season) {
+    if (!bracket) {
       return res.json({ error: 'Tournament bracket not available for this league/season', quadrants: [], podRankings: [] });
     }
 
